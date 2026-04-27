@@ -8,14 +8,14 @@ Sistema web completo para gestão de salão de beleza: agendamentos, clientes, p
 
 - **Agendamentos** — criação, edição, confirmação, conclusão e cancelamento; status em tempo real
 - **Clientes** — cadastro completo com histórico de agendamentos
-- **Profissionais** — gerenciamento de equipe com vinculação de serviços e agenda Google Calendar
+- **Profissionais** — gerenciamento de equipe com vinculação de serviços
 - **Serviços** — catálogo com duração e preço por serviço
 - **Produtos** — controle de estoque com categorias
 - **Pagamentos** — registro de pagamentos por agendamento
 - **Relatórios** — visão consolidada de receita (restrito a admins)
 - **Usuários** — controle de acesso com três perfis: `admin`, `recepcionista` e `profissional`
-- **Google Calendar** — cada profissional pode ter uma agenda individual sincronizada
 - **Google Sheets** — exportação automática de agendamentos e pagamentos em abas mensais (`Ag-YYYY-MM` / `Pag-YYYY-MM`)
+- **Google Calendar** — estrutura preparada para integração futura (atualmente stub)
 
 ---
 
@@ -30,7 +30,7 @@ Sistema web completo para gestão de salão de beleza: agendamentos, clientes, p
 | Frontend | Vue 3 · Vite · Pinia · Vue Router |
 | Estilo | Tailwind CSS |
 | Calendário UI | FullCalendar |
-| Integrações | Google Calendar API · Google Sheets API |
+| Integrações | Google Sheets API (Service Account) · Google Calendar API (stub) |
 
 ---
 
@@ -97,11 +97,6 @@ SECRET_KEY=uma-chave-secreta-longa-e-aleatoria
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Google Calendar (opcional)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
-
 # Google Sheets (opcional — necessita service_account.json)
 GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json
 GOOGLE_SPREADSHEET_ID=
@@ -164,10 +159,8 @@ pytest
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | ✅ | Tempo de expiração do token (padrão: `30`) |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | ⚠️ | Caminho para o JSON da service account Google |
 | `GOOGLE_SPREADSHEET_ID` | ⚠️ | ID da planilha Google Sheets para exportação |
-| `GOOGLE_CLIENT_ID` | ⚠️ | Client ID OAuth para Google Calendar |
-| `GOOGLE_CLIENT_SECRET` | ⚠️ | Client Secret OAuth para Google Calendar |
 
-> ⚠️ Variáveis marcadas são necessárias apenas se as integrações com Google forem utilizadas.
+> ⚠️ Variáveis marcadas são necessárias apenas se a integração com Google Sheets for utilizada.
 
 ---
 
