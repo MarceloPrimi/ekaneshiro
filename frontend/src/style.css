@@ -1,0 +1,74 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================================================================
+   SGK — Dark Mode Global Overrides
+   .dark .classe tem especificidade (0,2,0) > utilidades Tailwind (0,1,0)
+   Não é necessário !important nem alterar individualmente cada view.
+   ================================================================ */
+
+/* Surfaces */
+.dark .bg-white        { background-color: #1c1a28; }
+.dark .bg-gray-50      { background-color: #13111d; }
+.dark .bg-gray-100     { background-color: #252233; }
+.dark .bg-gray-200     { background-color: #302c44; }
+
+/* Text */
+.dark .text-gray-800   { color: #e4e0f8; }
+.dark .text-gray-700   { color: #c9c4e4; }
+.dark .text-gray-600   { color: #9c96c0; }
+.dark .text-gray-500   { color: #6e6888; }
+.dark .text-gray-400   { color: #504c66; }
+.dark .text-gray-300   { color: #3d3a55; }
+
+/* Borders */
+.dark .border-gray-100 { border-color: #272436; }
+.dark .border-gray-200 { border-color: #2e2b40; }
+.dark .border-gray-300 { border-color: #3a3554; }
+
+/* Dividers */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #272436; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #2e2b40; }
+
+/* Hover/active */
+.dark .hover\:bg-gray-50:hover  { background-color: #252233; }
+.dark .hover\:bg-gray-100:hover { background-color: #302c44; }
+.dark .bg-rose-50               { background-color: rgba(225, 29, 72, 0.14); }
+.dark .hover\:bg-rose-50:hover  { background-color: rgba(225, 29, 72, 0.09); }
+
+/* Form controls */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: #252233;
+  color: #e4e0f8;
+  border-color: #3a3554;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #6e6888; }
+
+/* Status badges — agendamentos */
+.dark .bg-yellow-100  { background-color: rgba(234, 179, 8, 0.15); }
+.dark .text-yellow-700 { color: #fbbf24; }
+.dark .bg-blue-100    { background-color: rgba(59, 130, 246, 0.15); }
+.dark .text-blue-700  { color: #60a5fa; }
+.dark .bg-green-100   { background-color: rgba(34, 197, 94, 0.15); }
+.dark .text-green-700 { color: #4ade80; }
+.dark .bg-red-100     { background-color: rgba(239, 68, 68, 0.15); }
+.dark .text-red-100   { background-color: rgba(239, 68, 68, 0.15); }
+.dark .text-red-700   { color: #f87171; }
+.dark .bg-red-50      { background-color: rgba(239, 68, 68, 0.09); }
+
+/* Role badges — usuários */
+.dark .bg-purple-100   { background-color: rgba(168, 85, 247, 0.15); }
+.dark .text-purple-700 { color: #c084fc; }
+.dark .bg-rose-100     { background-color: rgba(244, 63, 94, 0.15); }
+.dark .text-rose-700   { color: #fb7185; }
+
+/* Error / warning text */
+.dark .text-red-500    { color: #f87171; }
+.dark .text-red-600    { color: #f87171; }
+.dark .text-red-400    { color: #fca5a5; }
+.dark .hover\:text-red-500:hover { color: #f87171; }
+.dark .text-green-600  { color: #4ade80; }

@@ -1,0 +1,28 @@
+# Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# Database
+sqlalchemy==2.0.30
+pymysql==1.1.1
+alembic==1.13.1
+cryptography==42.0.7  # PyMySQL SSL support
+
+# Data Validation
+pydantic==2.7.1
+pydantic-settings==2.2.1
+email-validator==2.1.1  # required for Pydantic EmailStr
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1  # passlib 1.7.4 incompatível com bcrypt>=4.1
+
+# Google APIs
+google-api-python-client==2.128.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0
+
+# Utilities
+python-dotenv==1.0.1
+python-multipart==0.0.9  # Form data support

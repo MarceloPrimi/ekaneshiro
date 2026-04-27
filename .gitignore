@@ -1,0 +1,33 @@
+# .env contém segredos reais — NUNCA versionar
+.env
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Alembic gerado localmente (manter apenas versions/)
+# alembic/versions/ -> versionar normalmente
+
+# Google OAuth tokens e credenciais de serviço — NUNCA versionar
+token.json
+credentials.json
+service_account.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Others files
+DEPLOY.md
+contexto.md
+dianostico_sheets.py
+pytest_output.txt
