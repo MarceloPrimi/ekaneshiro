@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from schemas import UTCDatetime
+
 from db.models import StatusAgendamentoEnum
 from schemas.clientes import ClienteResponse
 from schemas.profissionais import ProfissionalResponse
@@ -18,6 +20,8 @@ class ItemAgendamentoCreate(BaseModel):
     servico_id: int
     profissional_id: int
     data_hora_inicio: datetime
+    # Se fornecido, sobrescreve a duração padrão do serviço
+    data_hora_fim: datetime | None = None
 
 
 class AgendamentoCreate(BaseModel):
@@ -67,7 +71,7 @@ class PagamentoResponse(BaseModel):
     agendamento_id: int
     valor: Decimal
     metodo: str
-    pago_em: datetime
+    pago_em: UTCDatetime
 
 
 class AgendamentoResponse(BaseModel):
@@ -78,6 +82,6 @@ class AgendamentoResponse(BaseModel):
     cliente: ClienteResponse | None = None
     status: StatusAgendamentoEnum
     observacoes: str | None
-    criado_em: datetime
+    criado_em: UTCDatetime
     itens: list[ItemAgendamentoResponse]
     pagamento: PagamentoResponse | None = None

@@ -46,7 +46,14 @@
         <label class="text-xs text-gray-500 font-medium">Até</label>
         <input v-model="filtroAte" type="date" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
       </div>
-      <button v-if="filtroStatus || filtroDe || filtroAte" @click="filtroStatus = ''; filtroDe = ''; filtroAte = ''" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded">✕ Limpar</button>
+      <button
+        @click="filtroPendentePag = !filtroPendentePag; filtroStatus = ''"
+        :class="[
+          'text-xs font-medium px-3 py-2 rounded-lg border transition-colors',
+          filtroPendentePag ? 'bg-yellow-500 text-white border-yellow-500' : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50',
+        ]"
+      >Pendentes de pagamento</button>
+      <button v-if="filtroStatus || filtroDe || filtroAte || filtroPendentePag" @click="filtroStatus = ''; filtroDe = ''; filtroAte = ''; filtroPendentePag = false" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded">✕ Limpar</button>
     </div>
 
     <!-- Tabela -->
@@ -58,7 +65,6 @@
       <table v-else class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">ID</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Cliente</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Serviços</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Total</th>
@@ -68,8 +74,14 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <tr v-for="ag in listaFiltrada" :key="ag.id" class="hover:bg-gray-50 align-top">
-            <td class="px-4 py-3 text-gray-400">#{{ ag.id }}</td>
+          <tr
+            v-for="ag in listaFiltrada"
+            :key="ag.id"
+            :class="[
+              'hover:bg-gray-50 align-top',
+              ag.status === 'concluido' && !ag.pagamento ? 'bg-red-50' : '',
+            ]"
+          >
             <td class="px-4 py-3 font-medium text-gray-800">{{ ag.cliente?.nome || '-' }}</td>
             <td class="px-4 py-3 text-gray-600">
               <div v-for="item in ag.itens" :key="item.id" class="text-xs leading-5">
@@ -81,24 +93,26 @@
               R$ {{ totalAgendamento(ag) }}
             </td>
             <td class="px-4 py-3">
-              <select
-                :value="ag.status"
-                class="border border-gray-200 rounded-md px-2 py-1 text-xs"
-                @change="alterarStatus(ag.id, $event.target.value)"
-              >
-                <option value="pendente">Pendente</option>
-                <option value="confirmado">Confirmado</option>
-                <option value="concluido">Concluído</option>
-                <option value="cancelado">Cancelado</option>
-              </select>
+              <span :class="statusBadgeClass(ag.status)" class="text-xs font-semibold px-2.5 py-0.5 rounded-full">{{ statusLabel(ag.status) }}</span>
             </td>
             <td class="px-4 py-3">
-              <div v-if="ag.pagamento" class="text-xs">
-                <span class="font-semibold text-green-700">R$ {{ Number(ag.pagamento.valor).toFixed(2) }}</span><br />
-                <span class="text-gray-400">{{ metodoPagLabel(ag.pagamento.metodo) }}</span><br />
-                <span class="text-gray-400">{{ formatDate(ag.pagamento.pago_em) }}</span>
+              <div v-if="ag.pagamento" class="text-xs space-y-0.5">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-semibold text-green-700">R$ {{ Number(ag.pagamento.valor).toFixed(2) }}</span>
+                  <span
+                    v-if="Number(ag.pagamento.valor) < Number(totalAgendamento(ag))"
+                    class="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-medium"
+                    :title="'Total original: R$ ' + totalAgendamento(ag)"
+                  >-R$ {{ (Number(totalAgendamento(ag)) - Number(ag.pagamento.valor)).toFixed(2) }}</span>
+                </div>
+                <div class="text-gray-400">{{ metodoPagLabel(ag.pagamento.metodo) }}</div>
+                <div class="text-gray-400">{{ formatDate(ag.pagamento.pago_em) }}</div>
               </div>
               <span v-else class="text-xs text-gray-300 italic">Não pago</span>
+              <span
+                v-if="ag.status === 'concluido' && !ag.pagamento"
+                class="inline-block mt-1 text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full"
+              >Inadimplente</span>
             </td>
             <td class="px-4 py-3">
               <button
@@ -127,28 +141,50 @@
           <div
             v-for="item in agSelecionado?.itens"
             :key="item.id"
-            class="flex justify-between text-xs text-gray-600"
+            class="flex justify-between items-center text-xs text-gray-600"
           >
             <span>{{ item.servico?.nome }}</span>
-            <span>R$ {{ Number(item.servico?.preco).toFixed(2) }}</span>
+            <button
+              type="button"
+              class="text-xs font-semibold text-rose-600 hover:underline ml-2"
+              @click="setValorBase(item.servico?.preco)"
+            >R$ {{ Number(item.servico?.preco).toFixed(2) }}</button>
           </div>
-          <div class="border-t border-gray-200 pt-1 flex justify-between text-sm font-bold text-gray-800">
+          <div class="border-t border-gray-200 pt-1 flex justify-between items-center text-sm font-bold text-gray-800">
             <span>Total</span>
-            <span>R$ {{ totalAgendamento(agSelecionado) }}</span>
+            <button
+              type="button"
+              class="font-bold text-gray-800 hover:text-rose-600 transition-colors"
+              @click="setValorBase(totalAgendamento(agSelecionado))"
+            >R$ {{ totalAgendamento(agSelecionado) }}</button>
           </div>
         </div>
 
         <form @submit.prevent="confirmarPagamento" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Valor cobrado (R$) *</label>
-            <input
-              v-model="formPag.valor"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Desconto (R$)</label>
+              <input
+                v-model="formPag.desconto"
+                type="number"
+                step="0.01"
+                min="0"
+                class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="flex-1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Valor a cobrar (R$) *</label>
+              <input
+                v-model="formPag.valor"
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                :class="{ 'border-amber-400 bg-amber-50': Number(formPag.desconto) > 0 }"
+              />
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Método *</label>
@@ -203,12 +239,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/api/client'
+import { useToast } from '@/composables/useToast'
+
+const { sucesso: toastSucesso } = useToast()
 
 const agendamentos = ref([])
 const loading = ref(true)
 const filtroStatus = ref('')
+const filtroPendentePag = ref(false)
 const filtroDe = ref('')
 const filtroAte = ref('')
 
@@ -216,8 +256,9 @@ const modalAberto = ref(false)
 const agSelecionado = ref(null)
 const saving = ref(false)
 const erro = ref('')
-const formPag = ref({ valor: '', metodo: '', novoStatus: '' })
-const mostrarTotal = ref(true)
+const formPag = ref({ valor: '', desconto: '0.00', metodo: '', novoStatus: '' })
+const mostrarTotal = ref(false)
+const baseValorModal = ref('0.00') // base antes do desconto (total ou preço de serviço selecionado)
 
 const totalRecebido = computed(() => {
   return listaFiltrada.value
@@ -228,6 +269,7 @@ const totalRecebido = computed(() => {
 
 const listaFiltrada = computed(() => {
   return agendamentos.value.filter(ag => {
+    if (filtroPendentePag.value && ag.pagamento) return false
     if (filtroStatus.value && ag.status !== filtroStatus.value) return false
     if (filtroDe.value || filtroAte.value) {
       const dataRef = ag.itens?.[0]?.data_hora_inicio ?? ag.criado_em
@@ -257,12 +299,28 @@ function alterarStatus(id, novoStatus) {
   api.patch(`/agendamentos/${id}/status`, { status: novoStatus }).then(fetchAgendamentos)
 }
 
+function setValorBase(preco) {
+  const v = Number(preco).toFixed(2)
+  baseValorModal.value = v
+  formPag.value.valor = v
+  formPag.value.desconto = '0.00'
+}
+
 function abrirModal(ag) {
   agSelecionado.value = ag
-  formPag.value = { valor: totalAgendamento(ag), metodo: '', novoStatus: '' }
+  const total = totalAgendamento(ag)
+  baseValorModal.value = total
+  formPag.value = { valor: total, desconto: '0.00', metodo: '', novoStatus: '' }
   erro.value = ''
   modalAberto.value = true
 }
+
+// Desconto reduz sempre a partir do valor base selecionado (total ou serviço isolado)
+watch(() => formPag.value.desconto, (desc) => {
+  if (!agSelecionado.value) return
+  const newValor = Math.max(0, Number(baseValorModal.value) - Number(desc)).toFixed(2)
+  if (Number(newValor) !== Number(formPag.value.valor)) formPag.value.valor = newValor
+})
 
 async function confirmarPagamento() {
   saving.value = true
@@ -279,6 +337,7 @@ async function confirmarPagamento() {
       metodo: formPag.value.metodo,
     })
     modalAberto.value = false
+    toastSucesso('Pagamento registrado com sucesso!')
     await fetchAgendamentos()
   } catch (e) {
     erro.value = e.response?.data?.detail || 'Erro ao registrar pagamento.'
@@ -296,13 +355,22 @@ function statusLabel(s) {
   return { pendente: 'Pendente', confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado' }[s] ?? s
 }
 
+function statusBadgeClass(s) {
+  return {
+    pendente:   'bg-yellow-100 text-yellow-800',
+    confirmado: 'bg-blue-100 text-blue-800',
+    concluido:  'bg-green-100 text-green-800',
+    cancelado:  'bg-red-100 text-red-800',
+  }[s] ?? 'bg-gray-100 text-gray-600'
+}
+
 function metodoPagLabel(m) {
   return { dinheiro: 'Dinheiro', pix: 'PIX', cartao_credito: 'Cartão Crédito', cartao_debito: 'Cartão Débito' }[m] ?? m
 }
 
 function formatDate(iso) {
   if (!iso) return '-'
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 }
 
 onMounted(fetchAgendamentos)

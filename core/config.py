@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
 
+    # CORS — origens permitidas separadas por vírgula
+    # Ex: "https://meu-app.vercel.app,https://outro-dominio.com"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
     # Google Sheets — Service Account
     GOOGLE_SERVICE_ACCOUNT_FILE: str = "service_account.json"
     # ID da planilha mestre criada pelo usuário e compartilhada com a service account

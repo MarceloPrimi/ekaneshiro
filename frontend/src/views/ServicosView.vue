@@ -20,7 +20,8 @@
             <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Descrição</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Duração</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Valor</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-600">Valor Base</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-600">Range de Preço</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Ativo</th>
             <th v-if="auth.isAdmin" class="px-4 py-3"></th>
           </tr>
@@ -31,6 +32,13 @@
             <td class="px-4 py-3 text-gray-500">{{ s.descricao || '-' }}</td>
             <td class="px-4 py-3 text-gray-500">{{ s.duracao_minutos }} min</td>
             <td class="px-4 py-3 text-gray-700">R$ {{ Number(s.preco).toFixed(2) }}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs">
+              <span v-if="s.preco_minimo || s.preco_maximo">
+                R$ {{ s.preco_minimo ? Number(s.preco_minimo).toFixed(2) : '—' }} →
+                R$ {{ s.preco_maximo ? Number(s.preco_maximo).toFixed(2) : '—' }}
+              </span>
+              <span v-else class="text-gray-300">—</span>
+            </td>
             <td class="px-4 py-3">
               <span :class="s.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium">
                 {{ s.ativo ? 'Ativo' : 'Inativo' }}
@@ -64,8 +72,21 @@
               <input v-model.number="form.duracao_minutos" type="number" min="1" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Preço (R$) *</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Preço Base (R$) *</label>
               <input v-model="form.preco" type="number" step="0.01" min="0" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Range de Preço <span class="text-gray-400 font-normal">(opcional)</span></label>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Mínimo (R$)</label>
+                <input v-model="form.preco_minimo" type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Máximo (R$)</label>
+                <input v-model="form.preco_maximo" type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
             </div>
           </div>
           <p v-if="erro" class="text-sm text-red-600">{{ erro }}</p>
@@ -98,8 +119,21 @@
               <input v-model.number="formEditar.duracao_minutos" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Preço Base (R$)</label>
               <input v-model="formEditar.preco" type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Range de Preço <span class="text-gray-400 font-normal">(opcional)</span></label>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Mínimo (R$)</label>
+                <input v-model="formEditar.preco_minimo" type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Máximo (R$)</label>
+                <input v-model="formEditar.preco_maximo" type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
             </div>
           </div>
           <div>
@@ -139,6 +173,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
+import { useToast } from '@/composables/useToast'
+
+const { sucesso: toastSucesso } = useToast()
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -151,8 +188,8 @@ const erro = ref('')
 const erroEditar = ref('')
 const editandoId = ref(null)
 const servicoParaExcluir = ref(null)
-const form = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '' })
-const formEditar = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', ativo: true })
+const form = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null })
+const formEditar = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null, ativo: true })
 
 async function fetchServicos() {
   loading.value = true
@@ -167,7 +204,7 @@ async function fetchServicos() {
 onMounted(fetchServicos)
 
 function abrirModal() {
-  form.value = { nome: '', descricao: '', duracao_minutos: null, preco: '' }
+  form.value = { nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null }
   erro.value = ''
   modalAberto.value = true
 }
@@ -178,7 +215,15 @@ function fecharModal() {
 
 function abrirModalEditar(s) {
   editandoId.value = s.id
-  formEditar.value = { nome: s.nome, descricao: s.descricao || '', duracao_minutos: s.duracao_minutos, preco: s.preco, ativo: s.ativo }
+  formEditar.value = {
+    nome: s.nome,
+    descricao: s.descricao || '',
+    duracao_minutos: s.duracao_minutos,
+    preco: s.preco,
+    preco_minimo: s.preco_minimo ?? null,
+    preco_maximo: s.preco_maximo ?? null,
+    ativo: s.ativo,
+  }
   erroEditar.value = ''
   modalEditar.value = true
 }
@@ -196,8 +241,11 @@ async function salvar() {
       descricao: form.value.descricao || null,
       duracao_minutos: form.value.duracao_minutos,
       preco: form.value.preco,
+      preco_minimo: form.value.preco_minimo || null,
+      preco_maximo: form.value.preco_maximo || null,
     })
     fecharModal()
+    toastSucesso('Serviço criado com sucesso!')
     await fetchServicos()
   } catch (e) {
     erro.value = e.response?.data?.detail || 'Erro ao salvar serviço.'
@@ -212,6 +260,7 @@ async function salvarEdicao() {
   try {
     await api.patch(`/servicos/${editandoId.value}`, formEditar.value)
     modalEditar.value = false
+    toastSucesso('Serviço atualizado com sucesso!')
     await fetchServicos()
   } catch (e) {
     erroEditar.value = e.response?.data?.detail || 'Erro ao atualizar serviço.'

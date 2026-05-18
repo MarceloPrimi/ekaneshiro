@@ -3,7 +3,11 @@ export default {
   darkMode: 'class',
   content: ["./index.html", "./src/**/*.{vue,js,ts}"],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 }

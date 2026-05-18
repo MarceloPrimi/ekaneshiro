@@ -8,6 +8,9 @@ from api.rotas_profissionais import router as profissionais_router
 from api.rotas_agendamentos import router as agendamentos_router
 from api.rotas_relatorios import router as relatorios_router
 from api.rotas_produtos import router as produtos_router
+from api.rotas_tarefas import router as tarefas_router
+
+from core.config import settings
 
 app = FastAPI(
     title="SGK — Sistema de Gestão Kaneshiro",
@@ -15,10 +18,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# --- CORS (ajuste origins em produção) ---
+# --- CORS ---
+# Em produção, defina ALLOWED_ORIGINS no painel da plataforma com a URL do frontend.
+# Múltiplas origens separadas por vírgula: "https://a.vercel.app,https://b.com"
+_origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +39,7 @@ app.include_router(profissionais_router)
 app.include_router(agendamentos_router)
 app.include_router(relatorios_router)
 app.include_router(produtos_router)
+app.include_router(tarefas_router)
 
 
 @app.get("/health", tags=["Status"])

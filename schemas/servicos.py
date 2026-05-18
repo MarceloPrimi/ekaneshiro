@@ -7,6 +7,8 @@ class ServicoCreate(BaseModel):
     descricao: str | None = None
     duracao_minutos: int
     preco: Decimal
+    preco_minimo: Decimal | None = None
+    preco_maximo: Decimal | None = None
 
 
 class ServicoUpdate(BaseModel):
@@ -14,6 +16,8 @@ class ServicoUpdate(BaseModel):
     descricao: str | None = None
     duracao_minutos: int | None = None
     preco: Decimal | None = None
+    preco_minimo: Decimal | None = None
+    preco_maximo: Decimal | None = None
     ativo: bool | None = None
 
 
@@ -25,4 +29,6 @@ class ServicoResponse(BaseModel):
     descricao: str | None
     duracao_minutos: int
     preco: Decimal
+    preco_minimo: Decimal | None = None
+    preco_maximo: Decimal | None = None
     ativo: bool

@@ -11,6 +11,7 @@ from schemas.profissionais import (
     ProfissionalComServicosResponse,
     ProfissionalCreate,
     ProfissionalResponse,
+    ProfissionalServicoPrecoUpdate,
     ProfissionalUpdate,
 )
 
@@ -207,4 +208,44 @@ def deletar_profissional(
     db.query(ProfissionalServico).filter_by(profissional_id=profissional_id).delete()
     db.query(ItemAgendamento).filter_by(profissional_id=profissional_id).delete()
     db.delete(profissional)
+    db.commit()
+
+
+@router.patch(
+    "/{profissional_id}/servicos/{servico_id}/preco",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Atualizar preço próprio do profissional para um serviço",
+)
+def atualizar_preco_proprio(
+    profissional_id: int,
+    servico_id: int,
+    payload: ProfissionalServicoPrecoUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
+):
+    """
+    Permite que o próprio profissional (ou um admin/recepcionista)
+    defina seu preço pessoal para um serviço habilitado.
+    """
+    # Profissional só pode alterar o seu próprio preço
+    from db.models import RoleEnum as RE
+    if current_user.role == RE.profissional:
+        prof_do_user = db.query(Profissional).filter_by(usuario_id=current_user.id).first()
+        if not prof_do_user or prof_do_user.id != profissional_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você só pode editar seu próprio preço.",
+            )
+
+    vinculo = (
+        db.query(ProfissionalServico)
+        .filter_by(profissional_id=profissional_id, servico_id=servico_id)
+        .first()
+    )
+    if not vinculo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vínculo profissional-serviço não encontrado.",
+        )
+    vinculo.preco_proprio = payload.preco_proprio
     db.commit()

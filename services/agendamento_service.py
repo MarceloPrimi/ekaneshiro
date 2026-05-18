@@ -119,6 +119,40 @@ def _checar_conflito(
         )
 
 
+def _checar_conflito_cliente(
+    db: Session,
+    cliente_id: int,
+    inicio: object,
+    fim: object,
+    excluir_agendamento_id: int | None = None,
+) -> None:
+    """
+    Garante que o cliente não possui outro ItemAgendamento
+    que sobreponha o intervalo [inicio, fim).
+    """
+    query = (
+        db.query(ItemAgendamento)
+        .join(Agendamento)
+        .filter(
+            Agendamento.cliente_id == cliente_id,
+            Agendamento.status != StatusAgendamentoEnum.cancelado,
+            ItemAgendamento.data_hora_inicio < fim,
+            ItemAgendamento.data_hora_fim > inicio,
+        )
+    )
+    if excluir_agendamento_id:
+        query = query.filter(Agendamento.id != excluir_agendamento_id)
+    conflito = query.first()
+    if conflito:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cliente já possui agendamento conflitante "
+                f"entre {_fmt_dt(inicio)} e {_fmt_dt(fim)}."
+            ),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Criação de agendamento (transação ACID completa)
 # ---------------------------------------------------------------------------
@@ -140,9 +174,34 @@ def criar_agendamento(
         profissional, servico = _validar_profissional_habilitado(
             db, item.profissional_id, item.servico_id
         )
-        fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
+        # Respeita data_hora_fim enviada pelo frontend; usa duração padrão caso omitida
+        if item.data_hora_fim is not None:
+            fim = item.data_hora_fim
+            if fim <= item.data_hora_inicio:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="data_hora_fim deve ser posterior a data_hora_inicio.",
+                )
+        else:
+            fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
         _checar_conflito(db, item.profissional_id, item.data_hora_inicio, fim)
         itens_preparados.append((item, profissional, servico, fim))
+
+    # Verificar disponibilidade do cliente
+    for i, (item_a, _, _, fim_a) in enumerate(itens_preparados):
+        # Contra agendamentos já existentes no banco
+        _checar_conflito_cliente(db, payload.cliente_id, item_a.data_hora_inicio, fim_a)
+        # Contra outros itens do mesmo request (dois serviços sobrepostos para o mesmo cliente)
+        for item_b, _, servico_b, fim_b in itens_preparados[i + 1:]:
+            if item_a.data_hora_inicio < fim_b and fim_a > item_b.data_hora_inicio:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"O cliente não pode ter dois serviços simultâneos: "
+                        f"{_fmt_dt(item_a.data_hora_inicio)}–{_fmt_dt(fim_a)} "
+                        f"e {_fmt_dt(item_b.data_hora_inicio)}–{_fmt_dt(fim_b)}."
+                    ),
+                )
 
     # 2. Persistir o cabeçalho do agendamento
     agendamento = Agendamento(
@@ -227,7 +286,15 @@ def atualizar_agendamento(
         profissional, servico = _validar_profissional_habilitado(
             db, item.profissional_id, item.servico_id
         )
-        fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
+        if item.data_hora_fim is not None:
+            fim = item.data_hora_fim
+            if fim <= item.data_hora_inicio:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="data_hora_fim deve ser posterior a data_hora_inicio.",
+                )
+        else:
+            fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
         # Para edição: ignorar conflitos com itens do próprio agendamento
         # Passamos excluir_item_id=None pois os itens antigos serão deletados antes;
         # basta checar contra todos os outros agendamentos exceto o atual.
@@ -249,6 +316,23 @@ def atualizar_agendamento(
                 detail=f"{profissional.nome} já possui agendamento conflitante entre {_fmt_dt(item.data_hora_inicio)} e {_fmt_dt(fim)}.",
             )
         itens_preparados.append((item, profissional, servico, fim))
+
+    # Verificar disponibilidade do cliente (excluindo o próprio agendamento)
+    for i, (item_a, _, _, fim_a) in enumerate(itens_preparados):
+        _checar_conflito_cliente(
+            db, agendamento.cliente_id, item_a.data_hora_inicio, fim_a,
+            excluir_agendamento_id=agendamento.id,
+        )
+        for item_b, _, _, fim_b in itens_preparados[i + 1:]:
+            if item_a.data_hora_inicio < fim_b and fim_a > item_b.data_hora_inicio:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"O cliente não pode ter dois serviços simultâneos: "
+                        f"{_fmt_dt(item_a.data_hora_inicio)}–{_fmt_dt(fim_a)} "
+                        f"e {_fmt_dt(item_b.data_hora_inicio)}–{_fmt_dt(fim_b)}."
+                    ),
+                )
 
     # 2. Remover eventos antigos do Google Calendar
     for item_antigo in agendamento.itens:

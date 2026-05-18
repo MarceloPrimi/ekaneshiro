@@ -15,6 +15,7 @@
     "@fullcalendar/list": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
     "@fullcalendar/vue3": "^6.1.20",
+    "@lucide/vue": "^1.16.0",
     "axios": "^1.15.2",
     "pinia": "^3.0.4",
     "vue": "^3.5.32",

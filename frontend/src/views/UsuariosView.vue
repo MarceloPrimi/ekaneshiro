@@ -138,6 +138,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
+import { useToast } from '@/composables/useToast'
+
+const { sucesso: toastSucesso } = useToast()
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -196,6 +199,7 @@ async function criarUsuario() {
   try {
     await api.post('/usuarios/', formCriar.value)
     modalCriar.value = false
+    toastSucesso('Usuário criado com sucesso!')
     await fetchUsuarios()
   } catch (e) {
     erroCriar.value = e.response?.data?.detail || 'Erro ao criar usuário.'
@@ -210,6 +214,7 @@ async function salvarEdicao() {
   try {
     await api.patch(`/usuarios/${editandoId.value}`, formEditar.value)
     modalEditar.value = false
+    toastSucesso('Usuário atualizado com sucesso!')
     await fetchUsuarios()
   } catch (e) {
     erroEditar.value = e.response?.data?.detail || 'Erro ao atualizar usuário.'

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Enum, ForeignKey,
-    Integer, Numeric, String, Text,
+    Integer, JSON, Numeric, String, Text,
 )
 from sqlalchemy.orm import relationship
 
@@ -57,6 +57,9 @@ class Cliente(Base):
     nome = Column(String(100), nullable=False)
     telefone = Column(String(20), nullable=True)
     email = Column(String(150), nullable=True, index=True)
+    observacoes = Column(Text, nullable=True)
+    # JSON: lista de {chave, valor} para campos customizados
+    campos_dinamicos = Column(JSON, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     agendamentos = relationship("Agendamento", back_populates="cliente")
@@ -72,6 +75,8 @@ class Profissional(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
     ativo = Column(Boolean, default=True, nullable=False)
+    telefone = Column(String(30), nullable=True)
+    chave_pix = Column(String(200), nullable=True)
 
     # Vínculo opcional com um usuário do sistema (para login com role=profissional)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, unique=True)
@@ -96,6 +101,8 @@ class Servico(Base):
     descricao = Column(Text, nullable=True)
     duracao_minutos = Column(Integer, nullable=False)
     preco = Column(Numeric(10, 2), nullable=False)
+    preco_minimo = Column(Numeric(10, 2), nullable=True)
+    preco_maximo = Column(Numeric(10, 2), nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
 
     profissionais = relationship("ProfissionalServico", back_populates="servico")
@@ -110,6 +117,8 @@ class ProfissionalServico(Base):
 
     profissional_id = Column(Integer, ForeignKey("profissionais.id"), primary_key=True)
     servico_id = Column(Integer, ForeignKey("servicos.id"), primary_key=True)
+    # Preço que este profissional cobra pelo serviço (sobrescreve o padrão do serviço)
+    preco_proprio = Column(Numeric(10, 2), nullable=True)
 
     profissional = relationship("Profissional", back_populates="servicos")
     servico = relationship("Servico", back_populates="profissionais")
@@ -243,3 +252,25 @@ class Produto(Base):
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Tarefas Internas (agenda pessoal da recepção, sem vínculo com cliente)
+# ---------------------------------------------------------------------------
+
+class TarefaInterna(Base):
+    __tablename__ = "tarefas_internas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(200), nullable=False)
+    descricao = Column(Text, nullable=True)
+    data_hora_inicio = Column(DateTime, nullable=False, index=True)
+    data_hora_fim = Column(DateTime, nullable=True)
+    # Usuário responsável (opcional — pode ser uma tarefa geral da recepção)
+    responsavel_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    concluida = Column(Boolean, default=False, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
+    criado_por = relationship("Usuario", foreign_keys=[criado_por_id])

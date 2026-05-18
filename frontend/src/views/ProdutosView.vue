@@ -311,6 +311,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
+import { useToast } from '@/composables/useToast'
+
+const { sucesso: toastSucesso } = useToast()
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -433,9 +436,8 @@ async function salvarNovo() {
     }
     await api.post('/produtos/', payload)
     modalNovo.value = false
+    toastSucesso('Produto criado com sucesso!')
     await fetchProdutos()
-  } catch (e) {
-    erroNovo.value = e.response?.data?.detail || 'Erro ao salvar produto.'
   } finally {
     salvando.value = false
   }
@@ -457,9 +459,8 @@ async function salvarEdicao() {
     }
     await api.patch(`/produtos/${editandoId.value}`, payload)
     modalEditar.value = false
+    toastSucesso('Produto atualizado com sucesso!')
     await fetchProdutos()
-  } catch (e) {
-    erroEditar.value = e.response?.data?.detail || 'Erro ao atualizar produto.'
   } finally {
     salvando.value = false
   }
@@ -474,9 +475,8 @@ async function salvarAjuste() {
       motivo: formAjuste.value.motivo || null,
     })
     modalAjuste.value = false
+    toastSucesso('Estoque ajustado com sucesso!')
     await fetchProdutos()
-  } catch (e) {
-    erroAjuste.value = e.response?.data?.detail || 'Erro ao ajustar estoque.'
   } finally {
     salvando.value = false
   }
@@ -529,6 +529,7 @@ async function salvarCategoria() {
       await api.post('/produtos/categorias/', { nome: formCategoria.value.nome })
     }
     modalCategoria.value = false
+    toastSucesso('Categoria salva com sucesso!')
     await fetchCategorias()
   } catch (e) {
     erroCategoria.value = e.response?.data?.detail || 'Erro ao salvar categoria.'

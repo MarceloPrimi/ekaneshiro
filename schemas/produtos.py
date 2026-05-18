@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from schemas import UTCDatetime
+
 
 class ProdutoCreate(BaseModel):
     nome: str
@@ -46,8 +48,8 @@ class ProdutoResponse(BaseModel):
     estoque_atual: int
     estoque_minimo: int
     ativo: bool
-    criado_em: datetime
-    atualizado_em: datetime | None
+    criado_em: UTCDatetime
+    atualizado_em: UTCDatetime | None
 
 
 class CategoriaProdutoCreate(BaseModel):
@@ -65,4 +67,4 @@ class CategoriaProdutoResponse(BaseModel):
     id: int
     nome: str
     ativo: bool
-    criado_em: datetime
+    criado_em: UTCDatetime
