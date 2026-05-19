@@ -14,7 +14,36 @@
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div v-if="loading" class="p-8 text-center text-sm text-gray-400">Carregando...</div>
       <div v-else-if="!profissionais.length" class="p-8 text-center text-sm text-gray-400">Nenhum profissional cadastrado.</div>
-      <table v-else class="w-full text-sm">
+
+      <!-- Mobile: cards -->
+      <div v-else class="sm:hidden divide-y divide-gray-100">
+        <div v-for="p in profissionais" :key="p.id" class="p-4 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="font-medium text-gray-800 text-sm">
+                {{ p.nome }}
+                <span v-if="ehMeuPerfil(p)" class="ml-1.5 text-xs text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full font-medium">Você</span>
+              </p>
+              <div class="flex items-center gap-2 mt-1">
+                <span :class="p.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium">{{ p.ativo ? 'Ativo' : 'Inativo' }}</span>
+                <span v-if="nomeUsuarioVinculado(p.usuario_id)" class="text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-medium">{{ nomeUsuarioVinculado(p.usuario_id) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button @click="abrirDetalhes(p)" class="flex-1 min-w-0 text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg py-2 px-3">Detalhes</button>
+            <template v-if="auth.isAdmin">
+              <button @click="abrirModalEditar(p)" class="flex-1 min-w-0 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3">Editar</button>
+              <button @click="abrirModalPrecos(p)" class="flex-1 min-w-0 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg py-2 px-3">Preços</button>
+              <button @click="confirmarExclusao(p)" class="text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3">Excluir</button>
+            </template>
+            <button v-else-if="ehMeuPerfil(p)" @click="abrirModalPrecos(p)" class="flex-1 min-w-0 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg py-2 px-3">Meus Preços</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop: tabela -->
+      <table v-if="!loading && profissionais.length" class="hidden sm:table w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
@@ -27,7 +56,6 @@
           <tr v-for="p in profissionais" :key="p.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-800">
               {{ p.nome }}
-              <!-- Indica o próprio profissional logado -->
               <span v-if="ehMeuPerfil(p)" class="ml-1.5 text-xs text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full font-medium">Você</span>
             </td>
             <td class="px-4 py-3">
@@ -60,8 +88,11 @@
     </div>
 
     <!-- Drawer Detalhes do Profissional -->
-    <div v-if="drawerDetalhes" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="drawerDetalhes = false">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div v-if="drawerDetalhes" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4" @click.self="drawerDetalhes = false">
+      <div class="bg-white w-full sm:max-w-3xl sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
+
+        <!-- Drag handle (mobile only) -->
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
 
         <!-- Cabeçalho -->
         <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -76,18 +107,32 @@
               </span>
             </p>
           </div>
-          <button @click="drawerDetalhes = false" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+          <button @click="drawerDetalhes = false" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
+        <!-- Tabs (mobile only) -->
+        <div class="sm:hidden flex border-b border-gray-100 flex-shrink-0">
+          <button
+            @click="drawerTab = 'contato'"
+            :class="drawerTab === 'contato' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition-colors"
+          >Contato</button>
+          <button
+            @click="drawerTab = 'servicos'"
+            :class="drawerTab === 'servicos' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition-colors"
+          >Serviços</button>
+        </div>
+
         <!-- Corpo: dois painéis -->
         <div class="flex flex-1 overflow-hidden">
 
           <!-- Esquerda: contato + pix (somente leitura) -->
-          <div class="w-72 flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5 space-y-5">
+          <div :class="['sm:w-72 w-full flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5 space-y-5', drawerTab !== 'contato' ? 'hidden sm:block' : '']">
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Telefone</p>
               <p v-if="profSelecionado?.telefone" class="text-sm text-gray-800">
@@ -104,7 +149,7 @@
           </div>
 
           <!-- Direita: serviços e preços -->
-          <div class="flex-1 overflow-y-auto p-5">
+          <div :class="['flex-1 overflow-y-auto p-5', drawerTab !== 'servicos' ? 'hidden sm:block' : '']">
             <h4 class="text-sm font-semibold text-gray-700 mb-4">Serviços habilitados</h4>
 
             <div v-if="!profSelecionado?.servicos?.length" class="text-sm text-gray-400 italic">Nenhum serviço habilitado.</div>
@@ -134,39 +179,43 @@
     </div>
 
     <!-- Modal Novo Profissional -->
-    <div v-if="modalAberto" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Novo Profissional</h3>
-        <form @submit.prevent="salvar" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-            <input v-model="form.nome" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Serviços</label>
-            <div v-if="!servicosDisponiveis.length" class="text-xs text-gray-400">Nenhum serviço cadastrado.</div>
-            <div v-else class="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-              <label
-                v-for="s in servicosDisponiveis"
-                :key="s.id"
-                class="flex items-center gap-2 px-1 py-1 rounded hover:bg-gray-50 cursor-pointer"
-              >
-                <input type="checkbox" :value="s.id" v-model="form.servico_ids" class="accent-rose-600" />
-                <span class="text-sm text-gray-700">{{ s.nome }}</span>
-                <span class="text-xs text-gray-400 ml-auto">{{ s.duracao_minutos }}min · R$ {{ Number(s.preco).toFixed(2) }}</span>
-              </label>
+    <div v-if="modalAberto" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" @click.self="fecharModal">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <!-- Drag handle mobile -->
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
+        <div class="flex-1 overflow-y-auto px-6 pt-5 pb-2">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">Novo Profissional</h3>
+          <form id="form-novo-prof" @submit.prevent="salvar" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+              <input v-model="form.nome" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
             </div>
-          </div>
 
-          <p v-if="erro" class="text-sm text-red-600">{{ erro }}</p>
-          <div class="flex justify-end gap-3 pt-2">
-            <button type="button" @click="fecharModal" class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">Cancelar</button>
-            <button type="submit" :disabled="salvando" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-60">
-              {{ salvando ? 'Salvando...' : 'Salvar' }}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Serviços</label>
+              <div v-if="!servicosDisponiveis.length" class="text-xs text-gray-400">Nenhum serviço cadastrado.</div>
+              <div v-else class="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                <label
+                  v-for="s in servicosDisponiveis"
+                  :key="s.id"
+                  class="flex items-center gap-2 px-1 py-1 rounded hover:bg-gray-50 cursor-pointer"
+                >
+                  <input type="checkbox" :value="s.id" v-model="form.servico_ids" class="accent-rose-600" />
+                  <span class="text-sm text-gray-700">{{ s.nome }}</span>
+                  <span class="text-xs text-gray-400 ml-auto">{{ s.duracao_minutos }}min · R$ {{ Number(s.preco).toFixed(2) }}</span>
+                </label>
+              </div>
+            </div>
+
+            <p v-if="erro" class="text-sm text-red-600">{{ erro }}</p>
+          </form>
+        </div>
+        <div class="flex gap-2 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+          <button type="button" @click="fecharModal" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
+          <button type="submit" form="form-novo-prof" :disabled="salvando" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60">
+            {{ salvando ? 'Salvando...' : 'Salvar' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -307,13 +356,14 @@
     </div>
 
     <!-- Confirmar Exclusão -->
-    <div v-if="profissionalParaExcluir" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-xs mx-4 p-6 text-center">
+    <div v-if="profissionalParaExcluir" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4">
+      <div class="bg-white w-full sm:max-w-xs sm:rounded-xl rounded-t-3xl shadow-xl p-6 text-center">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <p class="text-sm text-gray-700 mb-1">Excluir profissional</p>
         <p class="font-semibold text-gray-900 mb-6">{{ profissionalParaExcluir.nome }}</p>
-        <div class="flex justify-center gap-3">
-          <button @click="profissionalParaExcluir = null" class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">Cancelar</button>
-          <button @click="excluirProfissional" :disabled="salvando" class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-60">
+        <div class="flex gap-2">
+          <button @click="profissionalParaExcluir = null" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
+          <button @click="excluirProfissional" :disabled="salvando" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60">
             {{ salvando ? 'Excluindo...' : 'Excluir' }}
           </button>
         </div>
@@ -355,10 +405,12 @@ const salvandoPrecos = ref(false)
 
 // ─── Drawer Detalhes ──────────────────────────────────────────────────────
 const drawerDetalhes = ref(false)
+const drawerTab = ref('contato')
 const profSelecionado = ref(null)
 
 function abrirDetalhes(p) {
   profSelecionado.value = p
+  drawerTab.value = 'contato'
   drawerDetalhes.value = true
 }
 

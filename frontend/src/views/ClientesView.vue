@@ -8,7 +8,7 @@
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
           </svg>
-          <input v-model="busca" type="text" placeholder="Buscar cliente..." class="border border-gray-200 text-sm pl-9 pr-3 py-2 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-rose-300" />
+          <input v-model="busca" type="text" placeholder="Buscar cliente..." class="border border-gray-200 text-sm pl-9 pr-3 py-2 rounded-lg w-40 sm:w-52 focus:outline-none focus:ring-2 focus:ring-rose-300" />
         </div>
         <button class="bg-rose-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-rose-700 transition-colors" @click="abrirNovo">
           + Novo
@@ -50,8 +50,11 @@
     </div>
 
     <!-- Drawer (modal largo) -->
-    <div v-if="drawer" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="fechar">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div v-if="drawer" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4" @click.self="fechar">
+      <div class="bg-white w-full sm:max-w-3xl sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
+
+        <!-- Drag handle (mobile only) -->
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
 
         <!-- Cabeçalho do drawer -->
         <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -61,18 +64,32 @@
               {{ historicoItens.length }} visita{{ historicoItens.length !== 1 ? 's' : '' }} registrada{{ historicoItens.length !== 1 ? 's' : '' }}
             </p>
           </div>
-          <button @click="fechar" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+          <button @click="fechar" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
+        <!-- Tabs (mobile only) -->
+        <div class="sm:hidden flex border-b border-gray-100 flex-shrink-0">
+          <button
+            @click="clienteTab = 'dados'"
+            :class="clienteTab === 'dados' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition-colors"
+          >Dados</button>
+          <button
+            @click="clienteTab = 'historico'"
+            :class="clienteTab === 'historico' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition-colors"
+          >Histórico</button>
+        </div>
+
         <!-- Corpo: dois painéis -->
         <div class="flex flex-1 overflow-hidden">
 
           <!-- Esquerda: Formulário -->
-          <div class="w-72 flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5">
+          <div :class="['sm:w-72 w-full flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5', clienteTab !== 'dados' ? 'hidden sm:block' : '']">
             <form @submit.prevent="salvar" class="space-y-4">
 
               <!-- Nome -->
@@ -162,7 +179,7 @@
           </div>
 
           <!-- Direita: Histórico de visitas -->
-          <div class="flex-1 overflow-y-auto p-5">
+          <div :class="['flex-1 overflow-y-auto p-5', clienteTab !== 'historico' ? 'hidden sm:block' : '']">
             <h4 class="text-sm font-semibold text-gray-700 mb-4">Visitas anteriores</h4>
 
             <div v-if="!clienteSelecionado?.id" class="text-sm text-gray-400 italic">Salve o cliente para ver o histórico.</div>
@@ -208,6 +225,7 @@ const clientes = ref([])
 const loading = ref(true)
 const busca = ref('')
 const drawer = ref(false)
+const clienteTab = ref('dados')
 const clienteSelecionado = ref(null)
 const saving = ref(false)
 const modalError = ref('')
@@ -297,6 +315,7 @@ function abrirNovo() {
   historico.value = []
   editandoCampos.value = false
   modalError.value = ''
+  clienteTab.value = 'dados'
   drawer.value = true
 }
 
@@ -311,6 +330,7 @@ function abrirCliente(c) {
   }
   editandoCampos.value = false
   modalError.value = ''
+  clienteTab.value = 'dados'
   drawer.value = true
   fetchHistorico(c.id)
 }
