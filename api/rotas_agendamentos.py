@@ -1,7 +1,9 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import exists
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from api.dependencias import (
     get_current_admin,
@@ -22,9 +24,24 @@ from services import agendamento_service
 
 router = APIRouter(prefix="/agendamentos", tags=["Agendamentos"])
 
+# Opções de eager loading: evitam N+1 queries ao serializar cada agendamento
+_EAGER_OPTIONS = [
+    joinedload(Agendamento.cliente),
+    selectinload(Agendamento.itens).options(
+        joinedload(ItemAgendamento.servico),
+        joinedload(ItemAgendamento.profissional),
+    ),
+    joinedload(Agendamento.pagamento),
+]
+
 
 def _get_agendamento_ou_404(agendamento_id: int, db: Session) -> Agendamento:
-    agendamento = db.query(Agendamento).filter(Agendamento.id == agendamento_id).first()
+    agendamento = (
+        db.query(Agendamento)
+        .options(*_EAGER_OPTIONS)
+        .filter(Agendamento.id == agendamento_id)
+        .first()
+    )
     if not agendamento:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agendamento não encontrado."
@@ -53,12 +70,31 @@ def listar_agendamentos(
     cliente_id: int | None = None,
     status_filtro: StatusAgendamentoEnum | None = None,
     profissional_id: int | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
 ):
-    query = db.query(Agendamento)
+    query = db.query(Agendamento).options(*_EAGER_OPTIONS)
+
     if cliente_id:
         query = query.filter(Agendamento.cliente_id == cliente_id)
     if status_filtro:
         query = query.filter(Agendamento.status == status_filtro)
+
+    # Filtro de intervalo de datas via EXISTS — não cria join que duplica linhas
+    if data_inicio:
+        query = query.filter(
+            exists().where(
+                (ItemAgendamento.agendamento_id == Agendamento.id)
+                & (ItemAgendamento.data_hora_inicio >= data_inicio)
+            )
+        )
+    if data_fim:
+        query = query.filter(
+            exists().where(
+                (ItemAgendamento.agendamento_id == Agendamento.id)
+                & (ItemAgendamento.data_hora_inicio <= data_fim)
+            )
+        )
 
     # Profissional só enxerga os próprios agendamentos — restrição de role
     if current_user.role == RoleEnum.profissional:
@@ -69,11 +105,13 @@ def listar_agendamentos(
         # Admin / recepcionista podem usar o filtro opcional
         filtro_prof_id = profissional_id
 
+    # Filtro por profissional via EXISTS — evita join que interfere com eager loading
     if filtro_prof_id:
-        query = (
-            query.join(ItemAgendamento, ItemAgendamento.agendamento_id == Agendamento.id)
-            .filter(ItemAgendamento.profissional_id == filtro_prof_id)
-            .distinct()
+        query = query.filter(
+            exists().where(
+                (ItemAgendamento.agendamento_id == Agendamento.id)
+                & (ItemAgendamento.profissional_id == filtro_prof_id)
+            )
         )
 
     return query.order_by(Agendamento.criado_em.desc()).all()

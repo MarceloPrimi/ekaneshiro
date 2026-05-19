@@ -1698,7 +1698,14 @@ function alterarStatus(id, status) {
 
 async function fetchAgendamentos() {
   loading.value = true
-  const params = {}
+  const hoje = new Date()
+  // Janela de 3 meses passados + 3 meses futuros — cobre o calendário e a detecção de conflitos
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1)
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 4, 0)
+  const params = {
+    data_inicio: inicio.toISOString().slice(0, 10),
+    data_fim: fim.toISOString().slice(0, 10),
+  }
   if (filtroProfissional.value) params.profissional_id = filtroProfissional.value
   const { data } = await api.get('/agendamentos/', { params })
   agendamentos.value = data

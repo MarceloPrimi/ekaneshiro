@@ -290,7 +290,15 @@ const listaFiltrada = computed(() => {
 
 async function fetchAgendamentos() {
   loading.value = true
-  const { data } = await api.get('/agendamentos/')
+  const hoje = new Date()
+  // Janela de 6 meses passados + 1 mês futuro (cobre inadimplentes recentes)
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 6, 1)
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0)
+  const params = {
+    data_inicio: inicio.toISOString().slice(0, 10),
+    data_fim: fim.toISOString().slice(0, 10),
+  }
+  const { data } = await api.get('/agendamentos/', { params })
   agendamentos.value = data
   loading.value = false
 }

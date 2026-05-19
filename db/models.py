@@ -132,14 +132,15 @@ class Agendamento(Base):
     __tablename__ = "agendamentos"
 
     id = Column(Integer, primary_key=True, index=True)
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     status = Column(
         Enum(StatusAgendamentoEnum),
         nullable=False,
         default=StatusAgendamentoEnum.pendente,
+        index=True,
     )
     observacoes = Column(Text, nullable=True)
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
 
     cliente = relationship("Cliente", back_populates="agendamentos")
@@ -157,9 +158,9 @@ class ItemAgendamento(Base):
     __tablename__ = "itens_agendamento"
 
     id = Column(Integer, primary_key=True, index=True)
-    agendamento_id = Column(Integer, ForeignKey("agendamentos.id"), nullable=False)
+    agendamento_id = Column(Integer, ForeignKey("agendamentos.id"), nullable=False, index=True)
     servico_id = Column(Integer, ForeignKey("servicos.id"), nullable=False)
-    profissional_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False)
+    profissional_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False, index=True)
     data_hora_inicio = Column(DateTime, nullable=False, index=True)
     data_hora_fim = Column(DateTime, nullable=False)
 
