@@ -2,20 +2,12 @@
   <div class="flex flex-col h-full">
 
     <!-- Header -->
-    <!--
-      ARQUITETURA DO HEADER:
-      No desktop: todos os botões em linha, usando flex-wrap.
-      No mobile:  apenas a busca e o botão "Novo" ficam visíveis.
-                  Os demais ficam num menu dropdown (botão "⋮").
-      Usamos CSS (hidden sm:flex / sm:hidden) e não v-if aqui porque
-      não há custo de renderização extra — são elementos simples sem fetch de dados.
-      O v-if seria necessário apenas se houvesse componentes filhos pesados.
-    -->
+    <!-- Header compacto: busca + menu de ações unificado + botão Novo -->
     <div class="flex items-center justify-between mb-3 flex-shrink-0 gap-2">
       <h2 class="text-xl font-bold text-gray-800 shrink-0">Agendamentos</h2>
       <div class="flex items-center gap-2">
 
-        <!-- Busca por cliente (sempre visível, largura adaptada) -->
+        <!-- Busca por cliente (sempre visível) -->
         <div class="relative">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
@@ -24,7 +16,7 @@
             v-model="buscaCalendario"
             type="search"
             placeholder="Buscar..."
-            class="border border-gray-200 text-gray-600 text-sm pl-9 pr-8 py-2 rounded-lg w-32 sm:w-44 h-11 focus:outline-none focus:ring-2 focus:ring-rose-300"
+            class="border border-gray-200 text-gray-600 text-sm pl-9 pr-8 py-2 rounded-lg w-36 h-11 focus:outline-none focus:ring-2 focus:ring-rose-300"
           />
           <button
             v-if="buscaCalendario"
@@ -34,121 +26,82 @@
           >×</button>
         </div>
 
-        <!-- Ações DESKTOP: ocultas no mobile via hidden sm:flex -->
-        <template v-if="isRecepcionistaOuAdmin">
-          <select
-            v-model="filtroProfissional"
-            class="hidden sm:block border border-gray-200 text-gray-600 text-sm px-3 py-2 h-11 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300"
-          >
-            <option :value="null">Todos os profissionais</option>
-            <option v-for="p in profissionais" :key="p.id" :value="p.id">{{ p.nome }}</option>
-          </select>
-          <button
-            :class="[
-              'hidden sm:flex border text-sm font-medium px-3 py-2 h-11 rounded-lg transition-colors items-center gap-1.5',
-              colunaPorProfissional
-                ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
-            ]"
-            @click="toggleColunaPorProfissional"
-            title="Visão diária por profissional"
-          >
-            Visão Diária
-          </button>
-        </template>
-        <button
-          class="hidden sm:flex border border-gray-200 text-gray-600 text-sm font-medium px-4 py-2 h-11 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
-          @click="showClientesPanel = true"
-        >
-          Clientes
-        </button>
-        <!-- Toggle: pendentes próximos -->
-        <button
-          :class="[
-            'hidden sm:flex border text-sm font-medium px-3 py-2 h-11 rounded-lg transition-colors items-center gap-1.5',
-            filtroPendentesProximos
-              ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
-              : 'border-gray-200 text-gray-600 hover:bg-gray-50',
-          ]"
-          @click="filtroPendentesProximos = !filtroPendentesProximos"
-          title="Agendamentos pendentes nos próximos 4 dias úteis"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Pendentes
-          <span v-if="agendamentosPendentesProximos.length" class="ml-1 bg-white/30 text-current text-xs font-bold px-1.5 py-0.5 rounded-full">{{ agendamentosPendentesProximos.length }}</span>
-        </button>
-        <!-- Toggle filtrar tarefas no calendário -->
-        <button
-          :class="[
-            'hidden sm:flex border text-sm font-medium px-3 py-2 h-11 rounded-lg transition-colors items-center gap-1.5',
-            mostrarTarefas
-              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-              : 'border-gray-200 text-gray-400 hover:bg-gray-50',
-          ]"
-          @click="mostrarTarefas = !mostrarTarefas"
-          title="Filtrar tarefas no calendário"
-        >
-          Filtrar Tarefas
-        </button>
-
-        <!-- Menu de ações secundárias MOBILE ONLY (sm:hidden) -->
-        <!--
-          Usamos um overlay transparente (fixed inset-0) com z-10 para
-          capturar cliques fora do menu e fechá-lo, sem precisar de
-          bibliotecas externas de click-outside. O menu fica em z-20,
-          acima do overlay.
-        -->
-        <div class="relative sm:hidden">
+        <!-- Menu de ações unificado (sempre visível) -->
+        <div class="relative">
           <button
             @click="showMobileMenu = !showMobileMenu"
-            class="w-11 h-11 flex items-center justify-center border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors text-xl font-bold leading-none"
+            :class="[
+              'w-11 h-11 flex items-center justify-center border rounded-lg transition-colors',
+              showMobileMenu
+                ? 'bg-gray-100 border-gray-300 text-gray-800'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            ]"
             aria-label="Mais ações"
-          >⋮</button>
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="5" r="1" fill="currentColor" stroke="none"/>
+              <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
+              <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
           <!-- Overlay para fechar ao clicar fora -->
           <div v-if="showMobileMenu" class="fixed inset-0 z-10" @click="showMobileMenu = false"></div>
           <!-- Dropdown menu -->
           <div
             v-if="showMobileMenu"
-            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[200px] py-1.5 overflow-hidden"
+            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[220px] py-1.5 overflow-hidden"
           >
+            <!-- Clientes -->
             <button
-              class="w-full text-left px-4 py-3.5 text-sm text-gray-700 hover:bg-rose-50 active:bg-rose-100 flex items-center gap-2.5"
+              class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-rose-50 active:bg-rose-100 flex items-center gap-3"
               @click="showClientesPanel = true; showMobileMenu = false"
             >
-              Clientes
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span>Clientes</span>
             </button>
+
+            <div class="h-px bg-gray-100 mx-3 my-1"></div>
+
+            <!-- Pendentes próximos -->
             <button
-              class="w-full text-left px-4 py-3.5 text-sm text-gray-700 hover:bg-indigo-50 active:bg-indigo-100 flex items-center gap-2.5"
-              @click="abrirModalTarefa(); showMobileMenu = false"
-            >
-              Tarefa Interna
-            </button>
-            <button
-              class="w-full text-left px-4 py-3.5 text-sm flex items-center gap-2.5"
-              :class="filtroPendentesProximos ? 'text-amber-700 bg-amber-50/60' : 'text-gray-500 hover:bg-gray-50'"
+              class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
+              :class="filtroPendentesProximos ? 'text-amber-700 bg-amber-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
               @click="filtroPendentesProximos = !filtroPendentesProximos; showMobileMenu = false"
             >
-              <span>⚠️</span>
-              <span>Pendentes próximos{{ agendamentosPendentesProximos.length ? ` (${agendamentosPendentesProximos.length})` : '' }}{{ filtroPendentesProximos ? ' ✓' : '' }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" :class="filtroPendentesProximos ? 'text-amber-500' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="flex-1">Pendentes próximos</span>
+              <span v-if="agendamentosPendentesProximos.length" class="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ agendamentosPendentesProximos.length }}</span>
+              <svg v-if="filtroPendentesProximos" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </button>
+
+            <!-- Filtrar Tarefas -->
             <button
-              class="w-full text-left px-4 py-3.5 text-sm flex items-center gap-2.5"
-              :class="mostrarTarefas ? 'text-indigo-700 bg-indigo-50/60' : 'text-gray-500 hover:bg-gray-50'"
+              class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
+              :class="mostrarTarefas ? 'text-indigo-700 bg-indigo-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
               @click="mostrarTarefas = !mostrarTarefas; showMobileMenu = false"
             >
-              <span>✏️</span>
-              <span>{{ mostrarTarefas ? 'Filtrar Tarefas ✓' : 'Filtrar Tarefas' }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" :class="mostrarTarefas ? 'text-indigo-500' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              <span class="flex-1">Tarefas no calendário</span>
+              <svg v-if="mostrarTarefas" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </button>
+
+            <!-- Seção Admin/Recepcionista -->
             <template v-if="isRecepcionistaOuAdmin">
               <div class="h-px bg-gray-100 mx-3 my-1"></div>
+
+              <!-- Visão Diária -->
               <button
-                class="w-full text-left px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center gap-2.5"
+                class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
+                :class="colunaPorProfissional ? 'text-rose-700 bg-rose-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
                 @click="toggleColunaPorProfissional(); showMobileMenu = false"
               >
-                <span :class="colunaPorProfissional ? 'text-rose-600' : 'text-gray-400'">▦</span>
-                <span>{{ colunaPorProfissional ? 'Visão Diária ✓' : 'Visão Diária' }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" :class="colunaPorProfissional ? 'text-rose-500' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+                <span class="flex-1">Visão Diária</span>
+                <svg v-if="colunaPorProfissional" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-rose-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
               </button>
-              <div class="px-3 pb-2 pt-1">
+
+              <!-- Filtro de profissional -->
+              <div class="px-3 pb-2.5 pt-1">
                 <select
                   v-model="filtroProfissional"
                   class="w-full border border-gray-200 text-gray-600 text-sm px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-300"
@@ -1856,17 +1809,20 @@ onMounted(() => Promise.all([fetchAgendamentos(), fetchClientes(), fetchReferenc
   font-family: inherit;
   height: 100%;
 }
+.fc-wrapper .fc-toolbar {
+  padding: 4px 8px !important;
+}
 .fc-wrapper .fc-toolbar-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 .fc-wrapper .fc-button {
   background: white !important;
   border: 1px solid #e5e7eb !important;
   color: #374151 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.7rem !important;
   font-weight: 500 !important;
-  padding: 4px 10px !important;
+  padding: 3px 8px !important;
   box-shadow: none !important;
   border-radius: 6px !important;
 }
@@ -1881,7 +1837,7 @@ onMounted(() => Promise.all([fetchAgendamentos(), fetchClientes(), fetchReferenc
   outline: none !important;
 }
 .fc-wrapper .fc-timegrid-slot {
-  height: 3rem !important;
+  height: 2rem !important;
 }
 /* Evento timegrid: clip garantido no nível mais externo */
 .fc-wrapper .fc-timegrid-event {
