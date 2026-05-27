@@ -1046,7 +1046,7 @@ const modalError = ref('')
 const detalheAg = ref(null)
 const agParaExcluir = ref(null)
 const excluindoAg = ref(false)
-const detalheCorSelecionada = ref('#9ca3af')
+const detalheCorSelecionada = ref('#59C3B9')
 const coresFavoritas = ref([])
 
 const STATUS_LABELS = {
@@ -1125,7 +1125,7 @@ watch(detalheAg, (ag) => {
 })
 
 watch(detalheAg, (ag) => {
-  detalheCorSelecionada.value = normalizarHexColor(ag?.cor_hex) || '#9ca3af'
+  detalheCorSelecionada.value = normalizarHexColor(ag?.cor_hex) || '#59C3B9'
 })
 
 const clientesFiltrados = computed(() => {
@@ -1149,7 +1149,7 @@ function selectCliente(c) {
 }
 
 // ─── FullCalendar ──────────────────────────────────────────────────────────
-const DEFAULT_AGENDAMENTO_COLOR = '#9ca3af'
+const DEFAULT_AGENDAMENTO_COLOR = '#59C3B9'
 
 function normalizarHexColor(value) {
   if (!value) return null
