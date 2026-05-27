@@ -61,6 +61,11 @@
           <option v-for="sec in secoes" :key="sec.id" :value="sec.id">{{ sec.nome }}</option>
           <option :value="0">Sem seção</option>
         </select>
+        <select v-model="filtroStatus" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-rose-400 bg-white">
+          <option value="todos">Todos</option>
+          <option value="ativos">Apenas ativos</option>
+          <option value="inativos">Apenas inativos</option>
+        </select>
         <span class="text-xs text-gray-400">{{ servicosFiltrados.length }} resultado(s)</span>
       </div>
       <div v-if="selecaoIds.length" class="flex flex-wrap items-center gap-3 px-4 py-3 bg-rose-50 border-b border-rose-100">
@@ -380,14 +385,26 @@ function nomeSecao(id) {
 
 // ─── Seleção + filtro ──────────────────────────────────────────────────────
 const filtroSecao = ref(null)   // null = todas, 0 = sem seção, N = id da seção
+const filtroStatus = ref('todos') // todos | ativos | inativos
 const selecaoIds = ref([])      // IDs dos serviços selecionados
 const bulkAtribuirSecaoId = ref(null)
 const salvandoBulk = ref(false)
 
 const servicosFiltrados = computed(() => {
-  if (filtroSecao.value === null) return servicos.value
-  if (filtroSecao.value === 0)    return servicos.value.filter(s => !s.secao_id)
-  return servicos.value.filter(s => s.secao_id === filtroSecao.value)
+  let lista = servicos.value
+  if (filtroSecao.value === 0) {
+    lista = lista.filter(s => !s.secao_id)
+  } else if (filtroSecao.value !== null) {
+    lista = lista.filter(s => s.secao_id === filtroSecao.value)
+  }
+
+  if (filtroStatus.value === 'ativos') {
+    lista = lista.filter(s => s.ativo)
+  } else if (filtroStatus.value === 'inativos') {
+    lista = lista.filter(s => !s.ativo)
+  }
+
+  return lista
 })
 
 const todosSelecionados = computed(() => {

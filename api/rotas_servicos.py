@@ -2,11 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.dependencias import get_current_admin, get_current_user
 from db.database import get_db
-from db.models import Servico, Usuario
+from db.models import ProfissionalServico, Servico, Usuario
 from schemas.servicos import ServicoCreate, ServicoResponse, ServicoUpdate
 
 router = APIRouter(prefix="/servicos", tags=["Serviços"])
@@ -93,5 +94,16 @@ def deletar_servico(
     servico = db.query(Servico).filter(Servico.id == servico_id).first()
     if not servico:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Serviço não encontrado.")
-    db.delete(servico)
-    db.commit()
+    try:
+        # Remove vínculos N:N antes da exclusão do serviço.
+        db.query(ProfissionalServico).filter(ProfissionalServico.servico_id == servico_id).delete(
+            synchronize_session=False,
+        )
+        db.delete(servico)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este serviço possui histórico vinculado e não pode ser excluído. Inative-o em vez de excluir.",
+        )
