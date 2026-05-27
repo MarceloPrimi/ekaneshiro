@@ -1292,13 +1292,11 @@ const profissionaisColuna = computed(() => {
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
   locale: ptBrLocale,
-  // No mobile, timeGridWeek renderiza 7 colunas em ~375px — inutilizável.
-  // listWeek é a view mais amigável em telas pequenas.
-  initialView: isMobile.value ? 'listWeek' : 'timeGridWeek',
-  // headerToolbar no mobile: apenas prev/next e today. Os botões de view
-  // ficam escondidos pois o usuário pode usar gestos de swipe no listWeek.
+  // Em telas menores (ex: notebook com tela dividida), manter visão semanal do calendário.
+  initialView: isMobile.value ? 'timeGridWeek' : 'timeGridWeek',
+  // No mobile, mantém navegação e alternância rápida entre semana e lista.
   headerToolbar: isMobile.value
-    ? { left: 'prev,next', center: 'title', right: 'today' }
+    ? { left: 'prev,next', center: 'title', right: 'today,timeGridWeek,listWeek' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
   allDaySlot: false,
   slotMinTime: '07:00:00',
