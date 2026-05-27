@@ -31,3 +31,6 @@ DEPLOY.md
 contexto.md
 dianostico_sheets.py
 pytest_output.txt
+
+# Extração de dados Noona — dados brutos e scripts de migração one-shot
+extracao dados/

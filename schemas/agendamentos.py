@@ -50,8 +50,8 @@ class ItemAgendamentoResponse(BaseModel):
     id: int
     servico: ServicoResponse
     profissional: ProfissionalResponse
-    data_hora_inicio: datetime
-    data_hora_fim: datetime
+    data_hora_inicio: UTCDatetime
+    data_hora_fim: UTCDatetime
     google_event_id: str | None
 
 
