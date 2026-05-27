@@ -184,24 +184,9 @@ def criar_agendamento(
                 )
         else:
             fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
-        _checar_conflito(db, item.profissional_id, item.data_hora_inicio, fim)
         itens_preparados.append((item, profissional, servico, fim))
 
-    # Verificar disponibilidade do cliente
-    for i, (item_a, _, _, fim_a) in enumerate(itens_preparados):
-        # Contra agendamentos já existentes no banco
-        _checar_conflito_cliente(db, payload.cliente_id, item_a.data_hora_inicio, fim_a)
-        # Contra outros itens do mesmo request (dois serviços sobrepostos para o mesmo cliente)
-        for item_b, _, servico_b, fim_b in itens_preparados[i + 1:]:
-            if item_a.data_hora_inicio < fim_b and fim_a > item_b.data_hora_inicio:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f"O cliente não pode ter dois serviços simultâneos: "
-                        f"{_fmt_dt(item_a.data_hora_inicio)}–{_fmt_dt(fim_a)} "
-                        f"e {_fmt_dt(item_b.data_hora_inicio)}–{_fmt_dt(fim_b)}."
-                    ),
-                )
+    # Cliente pode ter serviços simultâneos; bloqueio permanece apenas por profissional.
 
     # 2. Persistir o cabeçalho do agendamento
     agendamento = Agendamento(
@@ -296,44 +281,9 @@ def atualizar_agendamento(
                 )
         else:
             fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
-        # Para edição: ignorar conflitos com itens do próprio agendamento
-        # Passamos excluir_item_id=None pois os itens antigos serão deletados antes;
-        # basta checar contra todos os outros agendamentos exceto o atual.
-        # Usamos um filtro customizado via subquery no lugar de _checar_conflito.
-        conflito_query = (
-            db.query(ItemAgendamento)
-            .join(Agendamento)
-            .filter(
-                ItemAgendamento.profissional_id == item.profissional_id,
-                Agendamento.status != StatusAgendamentoEnum.cancelado,
-                Agendamento.id != agendamento.id,
-                ItemAgendamento.data_hora_inicio < fim,
-                ItemAgendamento.data_hora_fim > item.data_hora_inicio,
-            )
-        )
-        if conflito_query.first():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"{profissional.nome} já possui agendamento conflitante entre {_fmt_dt(item.data_hora_inicio)} e {_fmt_dt(fim)}.",
-            )
         itens_preparados.append((item, profissional, servico, fim))
 
-    # Verificar disponibilidade do cliente (excluindo o próprio agendamento)
-    for i, (item_a, _, _, fim_a) in enumerate(itens_preparados):
-        _checar_conflito_cliente(
-            db, agendamento.cliente_id, item_a.data_hora_inicio, fim_a,
-            excluir_agendamento_id=agendamento.id,
-        )
-        for item_b, _, _, fim_b in itens_preparados[i + 1:]:
-            if item_a.data_hora_inicio < fim_b and fim_a > item_b.data_hora_inicio:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f"O cliente não pode ter dois serviços simultâneos: "
-                        f"{_fmt_dt(item_a.data_hora_inicio)}–{_fmt_dt(fim_a)} "
-                        f"e {_fmt_dt(item_b.data_hora_inicio)}–{_fmt_dt(fim_b)}."
-                    ),
-                )
+    # Cliente pode ter serviços simultâneos; bloqueio permanece apenas por profissional.
 
     # 2. Remover eventos antigos do Google Calendar
     for item_antigo in agendamento.itens:

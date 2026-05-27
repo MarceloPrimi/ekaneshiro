@@ -359,10 +359,19 @@
               </div>
               <div>
                 <label class="block text-xs text-gray-600 mb-1">Serviço</label>
-                <select v-model="item.servico_id" required class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" @change="onServicoChange(item, idx)">
-                  <option value="">Selecione...</option>
-                  <option v-for="s in servicos" :key="s.id" :value="s.id">{{ s.nome }}</option>
-                </select>
+                <input
+                  v-model="item.servico_busca"
+                  type="text"
+                  list="servicos-list"
+                  required
+                  placeholder="Buscar serviço..."
+                  class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  @input="onServicoBuscaInput(item, idx)"
+                  @change="onServicoBuscaInput(item, idx)"
+                />
+                <datalist id="servicos-list">
+                  <option v-for="s in servicos" :key="s.id" :value="s.nome"></option>
+                </datalist>
               </div>
               <div>
                 <label class="block text-xs text-gray-600 mb-1">Profissional</label>
@@ -371,7 +380,7 @@
                   <option v-for="p in profissionaisParaItem(item)" :key="p.id" :value="p.id">{{ p.nome }}</option>
                 </select>
                 <p v-if="item.servico_id && profissionaisParaItem(item).length === 0" class="text-xs text-amber-600 mt-1">Nenhum profissional habilitado para este serviço.</p>
-                <p v-if="conflictosPorItem[idx]" class="text-xs text-red-500 mt-1 font-medium">⚠ {{ conflictosPorItem[idx] }}</p>
+                <p v-if="conflictosPorItem[idx]" class="text-xs text-amber-700 mt-1 font-medium">⚠ {{ conflictosPorItem[idx] }}</p>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -393,7 +402,7 @@
                   <input v-if="sugestaoItemIdx === idx" v-model="sugestaoData" type="date" class="border border-gray-200 rounded-md px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300" />
                 </div>
                 <div v-if="sugestaoItemIdx === idx" class="mt-2">
-                  <p v-if="slotsDisponiveis.length === 0" class="text-xs text-gray-400 italic">Nenhum horário livre neste dia para este profissional e cliente.</p>
+                  <p v-if="slotsDisponiveis.length === 0" class="text-xs text-gray-400 italic">Nenhum horário livre neste dia para este profissional.</p>
                   <div v-else class="flex flex-wrap gap-1.5">
                     <button
                       v-for="slot in slotsDisponiveis"
@@ -474,6 +483,10 @@
           <!-- sm:block garante visibilidade no desktop. No mobile, controla a tab ativa. -->
           <div :class="['flex-1 overflow-y-auto p-5 border-r border-gray-100 min-w-0', isMobile && detalheTab !== 'servicos' ? 'hidden' : '']">
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Serviços</h4>
+            <div v-if="detalheAgColisoes.length" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+              <p class="text-xs font-semibold text-amber-800">Atenção: este agendamento colide com outro horário.</p>
+              <p class="text-xs text-amber-700 mt-0.5">{{ detalheAgColisoes[0] }}</p>
+            </div>
             <div class="space-y-2 mb-5">
               <div v-for="item in detalheAg.itens" :key="item.id" class="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <div class="flex items-center gap-2 mb-0.5">
@@ -1112,6 +1125,34 @@ const detalheClienteHistoricoItens = computed(() => {
   }
   return items.sort((a, b) => new Date(b.data_hora_inicio) - new Date(a.data_hora_inicio))
 })
+
+const detalheAgColisoes = computed(() => {
+  const ag = detalheAg.value
+  if (!ag || ag.status === 'cancelado') return []
+
+  const conflitos = []
+  for (const outro of agendamentos.value) {
+    if (!outro || outro.id === ag.id || outro.status === 'cancelado') continue
+
+    let colide = false
+    for (const itemA of ag.itens ?? []) {
+      const aInicio = new Date(itemA.data_hora_inicio)
+      const aFim = new Date(itemA.data_hora_fim ?? itemA.data_hora_inicio)
+      for (const itemB of outro.itens ?? []) {
+        const bInicio = new Date(itemB.data_hora_inicio)
+        const bFim = new Date(itemB.data_hora_fim ?? itemB.data_hora_inicio)
+        if (aInicio < bFim && aFim > bInicio) {
+          conflitos.push(`${outro.cliente?.nome ?? 'Outro cliente'} às ${formatHoraCliente(itemB.data_hora_inicio)}.`)
+          colide = true
+          break
+        }
+      }
+      if (colide) break
+    }
+  }
+
+  return conflitos
+})
 watch(detalheAg, (ag) => {
   if (ag?.cliente?.id) {
     loadingDetalheClienteHistorico.value = true
@@ -1179,7 +1220,7 @@ function getAgendamentoColor(ag) {
   const bgBase = normalizarHexColor(ag?.cor_hex) || DEFAULT_AGENDAMENTO_COLOR
   const textoEscuro = !isHexCorEscura(bgBase)
   return {
-    bg: corComAlpha(bgBase, 0.2),
+    bg: corComAlpha(bgBase, 0.9),
     border: bgBase,
     text: textoEscuro ? '#1f2937' : '#f9fafb',
   }
@@ -1250,6 +1291,7 @@ const calendarEvents = computed(() => {
       }
     }
   }
+
   return events
 })
 
@@ -1291,7 +1333,9 @@ const profissionaisColuna = computed(() => {
 
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
+  locales: [ptBrLocale],
   locale: ptBrLocale,
+  timeZone: 'America/Sao_Paulo',
   // Em telas menores (ex: notebook com tela dividida), manter visão semanal do calendário.
   initialView: isMobile.value ? 'timeGridWeek' : 'timeGridWeek',
   // No mobile, mantém navegação e alternância rápida entre semana e lista.
@@ -1303,15 +1347,27 @@ const calendarOptions = computed(() => ({
   slotMaxTime: computedSlotMax.value,
   slotDuration: '00:30:00',
   slotLabelInterval: '01:00:00',
-  slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+  slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' },
+  eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' },
+  buttonText: {
+    today: 'Hoje',
+    month: 'Mês',
+    week: 'Semana',
+    day: 'Dia',
+    list: 'Lista',
+  },
   expandRows: true,
   nowIndicator: true,
   editable: false,
   droppable: false,
   eventDurationEditable: false,
+  slotEventOverlap: true,
+  eventOverlap: true,
   selectable: true,
   selectMirror: true,
   dayMaxEvents: true,
+  eventMaxStack: 10,
+  eventMinHeight: 30,
   weekends: true,
   firstDay: 1,
   height: '100%',
@@ -1408,13 +1464,22 @@ function renderEventContent(arg) {
     : 60
 
   const firstName = (s) => s ? s.split(' ')[0] : ''
+  const nomeClienteResumido = (nome) => {
+    if (!nome) return ''
+    const partes = String(nome).trim().split(/\s+/)
+    if (partes.length === 1) return partes[0]
+    const primeiro = partes[0]
+    const ultimo = partes[partes.length - 1]
+    return `${primeiro} ${ultimo.charAt(0).toUpperCase()}.`
+  }
+  const clienteDisplayCurto = nomeClienteResumido(clienteNome)
   const te = escapeHtml
 
   // ≤ 30 min (~48px): linha única compacta
   if (durMin <= 30) {
     return {
       html: `<div class="fc-ev-chip">`
-        + `<span class="fc-ev-chip-name">${te(firstName(clienteNome))}</span>`
+        + `<span class="fc-ev-chip-name">${te(clienteDisplayCurto)}</span>`
         + (hora ? `<span class="fc-ev-chip-sep">·</span><span class="fc-ev-chip-time">${te(hora)}</span>` : '')
         + `</div>`,
     }
@@ -1425,7 +1490,7 @@ function renderEventContent(arg) {
     const sub = [servNome, firstName(profNome)].filter(Boolean).join(' · ')
     return {
       html: `<div class="fc-event-inner">`
-        + `<div class="fc-ev-title">${te(firstName(clienteNome))}</div>`
+        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
         + `</div>`,
     }
@@ -1454,6 +1519,16 @@ function onEventDidMount(info) {
   if (info.event.extendedProps.tipo === 'tarefa') return
   const statusLabel = info.event.extendedProps.statusLabel || 'Sem status'
   info.el.title = `Status: ${statusLabel}`
+
+  // O z-index efetivo no timeGrid fica no harness; elevar no hover traz o card para frente.
+  const harness = info.el.closest('.fc-timegrid-event-harness')
+  if (!harness) return
+  info.el.addEventListener('mouseenter', () => {
+    harness.style.zIndex = '40'
+  })
+  info.el.addEventListener('mouseleave', () => {
+    harness.style.zIndex = '1'
+  })
 }
 
 function onDateClick(info) {
@@ -1471,7 +1546,7 @@ async function onEventDrop(info) {
       itens: ag.itens.map(i => ({
         servico_id: i.servico?.id ?? i.servico_id,
         profissional_id: i.profissional?.id ?? i.profissional_id,
-        data_hora_inicio: new Date(new Date(i.data_hora_inicio).getTime() + delta).toISOString(),
+        data_hora_inicio: toDatetimeLocal(new Date(new Date(i.data_hora_inicio).getTime() + delta)),
       })),
     })
     await fetchAgendamentos()
@@ -1483,7 +1558,7 @@ async function onEventDrop(info) {
 
 // ─── Agendamento CRUD ──────────────────────────────────────────────────────
 function emptyItem(dt = '') {
-  return { servico_id: '', profissional_id: '', data_hora_inicio: dt, data_hora_fim: '' }
+  return { servico_id: '', servico_busca: '', profissional_id: '', data_hora_inicio: dt, data_hora_fim: '' }
 }
 
 function abrirModalNovo(dt = '', profId = null) {
@@ -1506,6 +1581,7 @@ function abrirModalEditar(ag) {
     observacoes: ag.observacoes || '',
     itens: ag.itens.map(i => ({
       servico_id: i.servico?.id ?? i.servico_id,
+      servico_busca: i.servico?.nome ?? '',
       profissional_id: i.profissional?.id ?? i.profissional_id,
       data_hora_inicio: toDatetimeLocal(i.data_hora_inicio),
       data_hora_fim: toDatetimeLocal(i.data_hora_fim),
@@ -1537,9 +1613,27 @@ function onServicoChange(item, idx) {
   if (!item.data_hora_inicio || !item.servico_id) return
   const servico = servicos.value.find(s => s.id === item.servico_id)
   if (!servico) return
+  item.servico_busca = servico.nome
   const inicio = new Date(item.data_hora_inicio)
   const fim = new Date(inicio.getTime() + servico.duracao_minutos * 60000)
   item.data_hora_fim = toDatetimeLocal(fim.toISOString())
+}
+
+function onServicoBuscaInput(item, idx) {
+  const termo = (item.servico_busca || '').trim().toLowerCase()
+  if (!termo) {
+    item.servico_id = ''
+    return
+  }
+
+  const servico = servicos.value.find(s => s.nome.toLowerCase() === termo)
+  if (!servico) {
+    item.servico_id = ''
+    return
+  }
+
+  item.servico_id = servico.id
+  onServicoChange(item, idx)
 }
 
 /** Quando o início muda, desloca o fim mantendo a duração */
@@ -1587,7 +1681,7 @@ const conflictosPorItem = computed(() => {
     const profId = Number(item.profissional_id)
     const editandoId = modalMode.value === 'edit' ? formData.value.id : null
 
-    // Verificar contra agendamentos existentes (profissional e cliente)
+    // Verificar contra agendamentos existentes
     for (const ag of agendamentos.value) {
       if (editandoId && ag.id === editandoId) continue
       if (ag.status === 'cancelado') continue
@@ -1599,11 +1693,11 @@ const conflictosPorItem = computed(() => {
         if ((ex.profissional?.id ?? ex.profissional_id) === profId)
           return `${ex.profissional?.nome ?? 'Profissional'} já tem "${ex.servico?.nome ?? 'serviço'}" às ${formatHoraCliente(ex.data_hora_inicio)}`
         if (clienteId && agClienteId === clienteId)
-          return `Cliente já tem "${ex.servico?.nome ?? 'serviço'}" às ${formatHoraCliente(ex.data_hora_inicio)} — dois serviços simultâneos não são permitidos`
+          return `Atenção: cliente já possui outro serviço nesse horário (${ex.servico?.nome ?? 'serviço'} às ${formatHoraCliente(ex.data_hora_inicio)}).`
       }
     }
 
-    // Verificar conflito entre itens do mesmo formulário (cliente não pode estar em dois lugares)
+    // Aviso entre itens do mesmo formulário
     for (let i = 0; i < formData.value.itens.length; i++) {
       if (i === idx) continue
       const other = formData.value.itens[i]
@@ -1612,7 +1706,7 @@ const conflictosPorItem = computed(() => {
       const oFim = new Date(other.data_hora_fim)
       if (inicio < oFim && fim > oInicio) {
         const otherServ = servicos.value.find(s => s.id === other.servico_id)
-        return `Conflito com Serviço ${i + 1} (${otherServ?.nome ?? '—'}) — cliente não pode ter dois serviços ao mesmo tempo`
+        return `Atenção: sobreposição com Serviço ${i + 1} (${otherServ?.nome ?? '—'}).`
       }
     }
 
@@ -2198,9 +2292,22 @@ onMounted(async () => {
 .fc-wrapper .fc-timegrid-slot {
   height: 2rem !important;
 }
+.fc-wrapper .fc-timegrid-event-harness {
+  z-index: 1;
+}
+.fc-wrapper .fc-timegrid-event-harness:hover {
+  z-index: 40 !important;
+}
 /* Evento timegrid: clip garantido no nível mais externo */
 .fc-wrapper .fc-timegrid-event {
+  z-index: 2 !important;
   overflow: hidden !important;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.fc-wrapper .fc-timegrid-event:hover {
+  z-index: 30 !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28) !important;
+  transform: translateY(-1px);
 }
 /* Zerar o padding que o FullCalendar coloca no fc-event-main;
    nós controlamos o espaçamento via fc-event-inner / fc-ev-chip */
