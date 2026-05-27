@@ -1335,7 +1335,9 @@ const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
   locales: [ptBrLocale],
   locale: ptBrLocale,
-  timeZone: 'America/Sao_Paulo',
+  // Mantém posicionamento na grade conforme o horário local informado pela API/UI.
+  // Evita deslocamento de +3h quando o FullCalendar interpreta timezone nomeado.
+  timeZone: 'local',
   // Em telas menores (ex: notebook com tela dividida), manter visão semanal do calendário.
   initialView: isMobile.value ? 'timeGridWeek' : 'timeGridWeek',
   // No mobile, mantém navegação e alternância rápida entre semana e lista.
@@ -1925,7 +1927,11 @@ async function excluirTarefa(t) {
 async function fetchTarefas() {
   try {
     const { data } = await api.get('/tarefas/')
-    tarefas.value = data
+    tarefas.value = (data || []).map(t => ({
+      ...t,
+      data_hora_inicio: normalizarDataHoraApi(t.data_hora_inicio),
+      data_hora_fim: normalizarDataHoraApi(t.data_hora_fim),
+    }))
   } catch (e) { console.error('Erro ao carregar tarefas:', e) }
 }
 
@@ -2054,7 +2060,14 @@ async function fetchAgendamentos(options = {}) {
   if (filtroProfissional.value) params.profissional_id = filtroProfissional.value
   try {
     const { data } = await api.get('/agendamentos/', { params })
-    agendamentos.value = data
+    agendamentos.value = (data || []).map(ag => ({
+      ...ag,
+      itens: (ag.itens || []).map(item => ({
+        ...item,
+        data_hora_inicio: normalizarDataHoraApi(item.data_hora_inicio),
+        data_hora_fim: normalizarDataHoraApi(item.data_hora_fim),
+      })),
+    }))
   } catch (e) {
     console.error('Erro ao carregar agendamentos:', e)
   } finally {
@@ -2186,6 +2199,21 @@ function toDatetimeLocal(iso) {
   }).formatToParts(d)
   const get = (type) => parts.find(p => p.type === type)?.value || '00'
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+}
+
+function normalizarDataHoraApi(value) {
+  if (!value || typeof value !== 'string') return value
+
+  // Em produção alguns horários chegam com sufixo UTC (Z/+00:00),
+  // mas representam horário local de operação. Removemos o fuso para
+  // manter a hora "de parede" correta no calendário (pt-BR).
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return value
+      .replace(/([zZ]|[+-]\d{2}:?\d{2})$/, '')
+      .replace(/\.\d+$/, '')
+  }
+
+  return value
 }
 
 function carregarCoresFavoritas() {
