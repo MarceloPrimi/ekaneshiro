@@ -36,7 +36,7 @@ class Usuario(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
-    email = Column(String(150), unique=True, nullable=False, index=True)
+    username = Column(String(150), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(RoleEnum), nullable=False, default=RoleEnum.recepcionista)
     ativo = Column(Boolean, default=True, nullable=False)
@@ -86,6 +86,7 @@ class Profissional(Base):
     google_calendar_id = Column(String(255), nullable=True)
 
     servicos = relationship("ProfissionalServico", back_populates="profissional")
+    secoes = relationship("ProfissionalSecao", back_populates="profissional")
     agendamentos = relationship("ItemAgendamento", back_populates="profissional")
 
 
@@ -105,7 +106,38 @@ class Servico(Base):
     preco_maximo = Column(Numeric(10, 2), nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
 
+    secao_id = Column(Integer, ForeignKey("secoes.id"), nullable=True, index=True)
+    secao = relationship("Secao", back_populates="servicos")
+
     profissionais = relationship("ProfissionalServico", back_populates="servico")
+
+
+# ---------------------------------------------------------------------------
+# Seções (agrupamento de serviços — ex: "Corte", "Manicure")
+# ---------------------------------------------------------------------------
+
+class Secao(Base):
+    __tablename__ = "secoes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False, unique=True)
+
+    servicos = relationship("Servico", back_populates="secao")
+    profissionais = relationship("ProfissionalSecao", back_populates="secao")
+
+
+# ---------------------------------------------------------------------------
+# Relacionamento N:N — Profissional atende Seção
+# ---------------------------------------------------------------------------
+
+class ProfissionalSecao(Base):
+    __tablename__ = "profissionais_secoes"
+
+    profissional_id = Column(Integer, ForeignKey("profissionais.id"), primary_key=True)
+    secao_id = Column(Integer, ForeignKey("secoes.id"), primary_key=True)
+
+    profissional = relationship("Profissional", back_populates="secoes")
+    secao = relationship("Secao", back_populates="profissionais")
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +171,7 @@ class Agendamento(Base):
         default=StatusAgendamentoEnum.pendente,
         index=True,
     )
+    cor_hex = Column(String(7), nullable=True)
     observacoes = Column(Text, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)

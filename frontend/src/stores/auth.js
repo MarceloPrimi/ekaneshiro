@@ -9,9 +9,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  async function login(email, senha) {
+  async function login(username, senha) {
     const params = new URLSearchParams()
-    params.append('username', email)
+    params.append('username', username)
     params.append('password', senha)
     const { data } = await api.post('/usuarios/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

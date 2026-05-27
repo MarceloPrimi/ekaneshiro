@@ -27,6 +27,7 @@ class ItemAgendamentoCreate(BaseModel):
 class AgendamentoCreate(BaseModel):
     cliente_id: int
     itens: list[ItemAgendamentoCreate]
+    cor_hex: str | None = None
     observacoes: str | None = None
 
 
@@ -37,7 +38,12 @@ class AgendamentoStatusUpdate(BaseModel):
 class AgendamentoUpdate(BaseModel):
     cliente_id: int
     itens: list[ItemAgendamentoCreate]
+    cor_hex: str | None = None
     observacoes: str | None = None
+
+
+class AgendamentoCorUpdate(BaseModel):
+    cor_hex: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -50,8 +56,10 @@ class ItemAgendamentoResponse(BaseModel):
     id: int
     servico: ServicoResponse
     profissional: ProfissionalResponse
-    data_hora_inicio: UTCDatetime
-    data_hora_fim: UTCDatetime
+    # Horários de agendamento são tratados como horário local de operação (America/Sao_Paulo).
+    # Não usar sufixo UTC (Z), pois isso desloca -3h no frontend ao renderizar.
+    data_hora_inicio: datetime
+    data_hora_fim: datetime
     google_event_id: str | None
 
 
@@ -81,6 +89,7 @@ class AgendamentoResponse(BaseModel):
     cliente_id: int
     cliente: ClienteResponse | None = None
     status: StatusAgendamentoEnum
+    cor_hex: str | None = None
     observacoes: str | None
     criado_em: UTCDatetime
     itens: list[ItemAgendamentoResponse]

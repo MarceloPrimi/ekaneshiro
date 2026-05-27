@@ -53,7 +53,7 @@
           filtroPendentePag ? 'bg-yellow-500 text-white border-yellow-500' : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50',
         ]"
       >Pendentes de pagamento</button>
-      <button v-if="filtroStatus || filtroDe || filtroAte || filtroPendentePag" @click="filtroStatus = ''; filtroDe = ''; filtroAte = ''; filtroPendentePag = false" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded">✕ Limpar</button>
+      <button v-if="filtroStatus || filtroDe !== hoje || filtroAte !== hoje || filtroPendentePag" @click="filtroStatus = ''; filtroDe = hoje; filtroAte = hoje; filtroPendentePag = false" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded">✕ Limpar</button>
     </div>
 
     <!-- Tabela -->
@@ -249,8 +249,9 @@ const agendamentos = ref([])
 const loading = ref(true)
 const filtroStatus = ref('')
 const filtroPendentePag = ref(false)
-const filtroDe = ref('')
-const filtroAte = ref('')
+const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+const filtroDe = ref(hoje)
+const filtroAte = ref(hoje)
 
 const modalAberto = ref(false)
 const agSelecionado = ref(null)

@@ -24,7 +24,6 @@
           <tr>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Telefone</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Email</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -37,7 +36,6 @@
           >
             <td class="px-4 py-3 font-medium text-gray-800">{{ c.nome }}</td>
             <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ c.telefone || '-' }}</td>
-            <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ c.email || '-' }}</td>
             <td class="px-4 py-3 text-right">
               <button class="text-xs text-red-400 hover:text-red-600 hover:underline" @click.stop="confirmarRemover(c)">Remover</button>
             </td>
@@ -98,21 +96,6 @@
                 <input v-model="form.nome" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
               </div>
 
-              <!-- Telefone -->
-              <div>
-                <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Número de telefone</label>
-                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400">
-                  <span class="flex items-center gap-1 px-3 py-2 bg-gray-50 text-sm text-gray-600 border-r border-gray-200 select-none whitespace-nowrap">🇧🇷 +55</span>
-                  <input v-model="form.telefone" class="flex-1 px-3 py-2 text-sm focus:outline-none" placeholder="(11) 99999-9999" />
-                </div>
-              </div>
-
-              <!-- Email -->
-              <div>
-                <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Endereço de e-mail</label>
-                <input v-model="form.email" type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
-              </div>
-
               <!-- Notas -->
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notas do cliente</label>
@@ -126,6 +109,15 @@
               <!-- Campos personalizados -->
               <div>
                 <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Número de telefone</label>
+                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400">
+                  <span class="flex items-center gap-1 px-3 py-2 bg-gray-50 text-sm text-gray-600 border-r border-gray-200 select-none whitespace-nowrap">🇧🇷 +55</span>
+                  <input v-model="form.telefone" class="flex-1 px-3 py-2 text-sm focus:outline-none" placeholder="(11) 99999-9999" />
+                </div>
+              </div>
+
+              <!-- Telefone -->
+              <div>
                   <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Campos personalizados</label>
                   <button
                     type="button"
@@ -230,7 +222,7 @@ const clienteSelecionado = ref(null)
 const saving = ref(false)
 const modalError = ref('')
 const editandoCampos = ref(false)
-const form = ref({ nome: '', email: '', telefone: '', observacoes: '', campos_dinamicos: [] })
+const form = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [] })
 
 const historico = ref([])
 const loadingHistorico = ref(false)
@@ -242,8 +234,7 @@ const clientesFiltrados = computed(() => {
   if (!q) return clientes.value
   return clientes.value.filter(c =>
     c.nome.toLowerCase().includes(q) ||
-    (c.telefone && c.telefone.includes(q)) ||
-    (c.email && c.email.toLowerCase().includes(q))
+    (c.telefone && c.telefone.includes(q))
   )
 })
 
@@ -311,7 +302,7 @@ async function fetchHistorico(clienteId) {
 
 function abrirNovo() {
   clienteSelecionado.value = null
-  form.value = { nome: '', email: '', telefone: '', observacoes: '', campos_dinamicos: [] }
+  form.value = { nome: '', telefone: '', observacoes: '', campos_dinamicos: [] }
   historico.value = []
   editandoCampos.value = false
   modalError.value = ''
@@ -323,7 +314,6 @@ function abrirCliente(c) {
   clienteSelecionado.value = c
   form.value = {
     nome: c.nome,
-    email: c.email || '',
     telefone: c.telefone || '',
     observacoes: c.observacoes || '',
     campos_dinamicos: c.campos_dinamicos ? JSON.parse(JSON.stringify(c.campos_dinamicos)) : [],
@@ -354,7 +344,6 @@ async function salvar() {
   try {
     const payload = {
       nome: form.value.nome,
-      email: form.value.email || null,
       telefone: form.value.telefone || null,
       observacoes: form.value.observacoes || null,
       campos_dinamicos: form.value.campos_dinamicos.length ? form.value.campos_dinamicos : null,

@@ -3,21 +3,24 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-sm p-8">
 
       <!-- Brand -->
-      <div class="mb-8">
-        <h1 class="text-2xl font-semibold tracking-wide text-gray-900">Sanshin</h1>
-        <p class="text-sm text-gray-400 mt-0.5">Beleza e gestão</p>
+      <div class="mb-8 flex justify-center items-center pt-2 pb-1">
+        <img
+          src="/logo.png"
+          alt="Logo Sanshin"
+          class="block w-36 h-36 object-contain object-center"
+        />
       </div>
 
       <form @submit.prevent="handleLogin" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1.5">E-mail</label>
+          <label class="block text-sm font-medium text-gray-600 mb-1.5">Usuário</label>
           <input
-            v-model="form.email"
-            type="email"
+            v-model="form.username"
+            type="text"
             required
-            autocomplete="email"
+            autocomplete="username"
             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-transparent transition"
-            placeholder="seu@email.com"
+            placeholder="seu_usuario"
           />
         </div>
         <div>
@@ -50,7 +53,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const form = reactive({ email: '', senha: '' })
+const form = reactive({ username: '', senha: '' })
 const error = ref('')
 const loading = ref(false)
 
@@ -58,7 +61,7 @@ async function handleLogin() {
   error.value = ''
   loading.value = true
   try {
-    await auth.login(form.email, form.senha)
+    await auth.login(form.username, form.senha)
     router.push('/agendamentos')
   } catch (e) {
     error.value = e.response?.data?.detail || 'Erro ao fazer login.'

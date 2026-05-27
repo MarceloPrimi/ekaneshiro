@@ -206,6 +206,7 @@ def criar_agendamento(
     # 2. Persistir o cabeçalho do agendamento
     agendamento = Agendamento(
         cliente_id=payload.cliente_id,
+        cor_hex=payload.cor_hex,
         observacoes=payload.observacoes,
         criado_por_id=criado_por_id,
     )
@@ -352,6 +353,7 @@ def atualizar_agendamento(
 
     # 4. Atualizar cabeçalho
     agendamento.cliente_id = payload.cliente_id
+    agendamento.cor_hex = payload.cor_hex
     agendamento.observacoes = payload.observacoes
     db.flush()
 
@@ -423,6 +425,17 @@ def atualizar_status(
                 except Exception:
                     pass  # Não bloqueia o cancelamento por falha no Calendar
 
+    db.commit()
+    db.refresh(agendamento)
+    return agendamento
+
+
+def atualizar_cor(
+    db: Session,
+    agendamento: Agendamento,
+    cor_hex: str | None,
+) -> Agendamento:
+    agendamento.cor_hex = cor_hex
     db.commit()
     db.refresh(agendamento)
     return agendamento

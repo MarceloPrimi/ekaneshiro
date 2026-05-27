@@ -3,6 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from schemas.servicos import ServicoResponse
+from schemas.secoes import SecaoResponse
 
 
 class ProfissionalCreate(BaseModel):
@@ -11,6 +12,7 @@ class ProfissionalCreate(BaseModel):
     google_calendar_id: str | None = None
     telefone: str | None = None
     chave_pix: str | None = None
+    secao_ids: list[int] = []
 
 
 class ProfissionalUpdate(BaseModel):
@@ -20,6 +22,7 @@ class ProfissionalUpdate(BaseModel):
     usuario_id: int | None = None  # enviar null = desvincular; omitir = não alterar
     telefone: str | None = None
     chave_pix: str | None = None
+    secao_ids: list[int] | None = None  # None = não alterar; lista vazia = remover todos
 
 
 class ProfissionalResponse(BaseModel):
@@ -43,6 +46,7 @@ class ProfissionalComServicosResponse(ProfissionalResponse):
     model_config = {"from_attributes": True}
 
     servicos: list[ServicoComPrecoResponse] = []
+    secoes: list[SecaoResponse] = []
 
     @classmethod
     def from_orm_with_servicos(cls, profissional):
@@ -59,9 +63,11 @@ class ProfissionalComServicosResponse(ProfissionalResponse):
                     preco_minimo=s.preco_minimo,
                     preco_maximo=s.preco_maximo,
                     ativo=s.ativo,
+                    secao_id=s.secao_id,
                     preco_proprio=ps.preco_proprio,
                 )
             )
+        secoes = [SecaoResponse(id=ps.secao.id, nome=ps.secao.nome) for ps in profissional.secoes]
         return cls(
             id=profissional.id,
             nome=profissional.nome,
@@ -71,6 +77,7 @@ class ProfissionalComServicosResponse(ProfissionalResponse):
             telefone=profissional.telefone,
             chave_pix=profissional.chave_pix,
             servicos=servicos_com_preco,
+            secoes=secoes,
         )
 
 

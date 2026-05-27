@@ -34,3 +34,6 @@ pytest_output.txt
 
 # Extração de dados Noona — dados brutos e scripts de migração one-shot
 extracao dados/
+seed.py
+test.db
+resource/

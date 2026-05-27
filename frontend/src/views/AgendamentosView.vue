@@ -26,8 +26,8 @@
           >×</button>
         </div>
 
-        <!-- Menu de ações unificado (sempre visível) -->
-        <div class="relative">
+        <!-- Menu de ações (apenas mobile) -->
+        <div v-if="isMobile" class="relative">
           <button
             @click="showMobileMenu = !showMobileMenu"
             :class="[
@@ -44,14 +44,11 @@
               <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/>
             </svg>
           </button>
-          <!-- Overlay para fechar ao clicar fora -->
           <div v-if="showMobileMenu" class="fixed inset-0 z-10" @click="showMobileMenu = false"></div>
-          <!-- Dropdown menu -->
           <div
             v-if="showMobileMenu"
             class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[220px] py-1.5 overflow-hidden"
           >
-            <!-- Clientes -->
             <button
               class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-rose-50 active:bg-rose-100 flex items-center gap-3"
               @click="showClientesPanel = true; showMobileMenu = false"
@@ -62,7 +59,6 @@
 
             <div class="h-px bg-gray-100 mx-3 my-1"></div>
 
-            <!-- Pendentes próximos -->
             <button
               class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
               :class="filtroPendentesProximos ? 'text-amber-700 bg-amber-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
@@ -74,7 +70,6 @@
               <svg v-if="filtroPendentesProximos" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </button>
 
-            <!-- Filtrar Tarefas -->
             <button
               class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
               :class="mostrarTarefas ? 'text-indigo-700 bg-indigo-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
@@ -85,11 +80,8 @@
               <svg v-if="mostrarTarefas" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </button>
 
-            <!-- Seção Admin/Recepcionista -->
             <template v-if="isRecepcionistaOuAdmin">
               <div class="h-px bg-gray-100 mx-3 my-1"></div>
-
-              <!-- Visão Diária -->
               <button
                 class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
                 :class="colunaPorProfissional ? 'text-rose-700 bg-rose-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
@@ -99,8 +91,6 @@
                 <span class="flex-1">Visão Diária</span>
                 <svg v-if="colunaPorProfissional" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-rose-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
               </button>
-
-              <!-- Filtro de profissional -->
               <div class="px-3 pb-2.5 pt-1">
                 <select
                   v-model="filtroProfissional"
@@ -112,6 +102,44 @@
               </div>
             </template>
           </div>
+        </div>
+
+        <!-- Ações em botões diretos (desktop) -->
+        <div v-else class="flex items-center gap-2">
+          <button
+            class="h-11 px-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+            @click="showClientesPanel = true"
+          >Clientes</button>
+
+          <button
+            class="h-11 px-3 border rounded-lg text-sm flex items-center gap-1.5"
+            :class="filtroPendentesProximos ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+            @click="filtroPendentesProximos = !filtroPendentesProximos"
+          >
+            Pendentes próximos
+            <span v-if="agendamentosPendentesProximos.length" class="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ agendamentosPendentesProximos.length }}</span>
+          </button>
+
+          <button
+            class="h-11 px-3 border rounded-lg text-sm"
+            :class="mostrarTarefas ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+            @click="mostrarTarefas = !mostrarTarefas"
+          >Tarefas no calendário</button>
+
+          <template v-if="isRecepcionistaOuAdmin">
+            <button
+              class="h-11 px-3 border rounded-lg text-sm"
+              :class="colunaPorProfissional ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+              @click="toggleColunaPorProfissional()"
+            >Visão Diária</button>
+            <select
+              v-model="filtroProfissional"
+              class="h-11 min-w-[220px] border border-gray-200 text-gray-600 text-sm px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300"
+            >
+              <option :value="null">Todos os profissionais</option>
+              <option v-for="p in profissionais" :key="p.id" :value="p.id">{{ p.nome }}</option>
+            </select>
+          </template>
         </div>
 
         <!-- Botão principal: sempre visível com touch target mínimo de 44px -->
@@ -250,6 +278,7 @@
                 :key="ev.id"
                 class="absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-xs cursor-pointer overflow-hidden"
                 :style="colunaEventoStyle(ev)"
+                :title="`Status: ${STATUS_LABELS[ev.ag?.status] || ev.ag?.status || 'Sem status'}`"
                 @click="detalheAg = ev.ag"
               >
                 <div class="font-semibold truncate" :style="{ color: ev.color.text }">{{ ev.clienteNome }}</div>
@@ -467,13 +496,64 @@
               <option value="cancelado">Cancelado</option>
             </select>
 
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cor do Agendamento</h4>
+            <div class="mb-5 space-y-2.5">
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="detalheCorSelecionada"
+                  type="color"
+                  class="w-14 h-11 border border-gray-200 rounded-lg p-1 cursor-pointer"
+                />
+                <input
+                  v-model="detalheCorSelecionada"
+                  type="text"
+                  class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm h-11 uppercase"
+                  placeholder="#E5E7EB"
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="salvarCorAgendamento"
+                  class="flex-1 bg-gray-800 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-gray-900 transition-colors"
+                >Salvar cor</button>
+                <button
+                  @click="salvarCorFavorita"
+                  class="flex-1 border border-gray-200 text-gray-700 rounded-lg py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
+                >Salvar na paleta</button>
+              </div>
+              <div v-if="coresFavoritas.length" class="flex flex-wrap gap-2 pt-1">
+                <button
+                  v-for="cor in coresFavoritas"
+                  :key="cor"
+                  class="w-7 h-7 rounded-full border border-white shadow-sm ring-1 ring-gray-200"
+                  :style="{ backgroundColor: cor }"
+                  :title="cor"
+                  @click="detalheCorSelecionada = cor"
+                ></button>
+              </div>
+            </div>
+
             <div v-if="detalheAg.observacoes" class="mb-5">
               <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Observações</h4>
               <p class="text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">{{ detalheAg.observacoes }}</p>
             </div>
 
-            <button @click="abrirModalEditar(detalheAg); detalheAg = null" class="w-full bg-rose-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-rose-700 transition-colors">
+            <button @click="abrirModalEditar(detalheAg); detalheAg = null" class="w-full bg-rose-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-rose-700 transition-colors mb-2">
               Editar Agendamento
+            </button>
+            <button
+              v-if="!detalheAg.pagamento && detalheAg.status !== 'cancelado'"
+              @click="abrirModalPagamento(detalheAg); detalheAg = null"
+              class="w-full border border-green-300 text-green-700 rounded-xl py-3 text-sm font-semibold hover:bg-green-50 transition-colors mb-2"
+            >
+              Registrar Pagamento
+            </button>
+            <button
+              v-if="authStore.user?.role === 'admin' || authStore.user?.role === 'recepcionista'"
+              @click="confirmarExcluirAg(detalheAg)"
+              class="w-full border border-red-200 text-red-600 rounded-xl py-3 text-sm font-semibold hover:bg-red-50 transition-colors"
+            >
+              Excluir Agendamento
             </button>
           </div>
 
@@ -483,7 +563,6 @@
             <div class="bg-gray-50 rounded-xl p-3.5 border border-gray-100 mb-4">
               <p class="text-sm font-bold text-gray-800">{{ detalheAg.cliente?.nome }}</p>
               <p v-if="detalheAg.cliente?.telefone" class="text-xs text-gray-500 mt-1">{{ detalheAg.cliente.telefone }}</p>
-              <p v-if="detalheAg.cliente?.email" class="text-xs text-gray-500 mt-0.5">{{ detalheAg.cliente.email }}</p>
               <p v-if="detalheAg.cliente?.observacoes" class="text-xs text-gray-400 mt-1.5 italic">{{ detalheAg.cliente.observacoes }}</p>
               <button
                 class="mt-3 text-xs text-rose-600 font-semibold hover:underline"
@@ -511,6 +590,98 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Confirmar Exclusão de Agendamento -->
+    <div v-if="agParaExcluir" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4">
+      <div class="bg-white w-full sm:max-w-xs sm:rounded-xl rounded-t-3xl shadow-xl p-6 text-center">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+        <p class="text-sm text-gray-700 mb-1">Excluir agendamento</p>
+        <p class="font-semibold text-gray-900 mb-4">{{ agParaExcluir.cliente?.nome }}</p>
+        <p class="text-xs text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+        <div class="flex gap-2">
+          <button @click="agParaExcluir = null" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
+          <button @click="excluirAgendamento" :disabled="excluindoAg" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60">
+            {{ excluindoAg ? 'Excluindo...' : 'Excluir' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Registrar Pagamento (a partir dos agendamentos) -->
+    <div v-if="modalPagAberto" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4" @click.self="modalPagAberto = false">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
+        <div class="flex-1 overflow-y-auto px-6 pt-5 pb-2">
+          <h3 class="text-lg font-semibold text-gray-800 mb-1">Registrar Pagamento</h3>
+          <p class="text-sm text-gray-500 mb-4">
+            #{{ agPagSelecionado?.id }} · {{ agPagSelecionado?.cliente?.nome }}
+          </p>
+
+          <!-- Breakdown dos serviços -->
+          <div class="bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+            <div v-for="item in agPagSelecionado?.itens" :key="item.id"
+              class="flex justify-between items-center text-xs text-gray-600">
+              <span>{{ item.servico?.nome }}</span>
+              <button type="button" class="text-xs font-semibold text-rose-600 hover:underline ml-2"
+                @click="setPagValorBase(item.servico?.preco)">
+                R$ {{ Number(item.servico?.preco).toFixed(2) }}
+              </button>
+            </div>
+            <div class="border-t border-gray-200 pt-1 flex justify-between items-center text-sm font-bold text-gray-800">
+              <span>Total</span>
+              <button type="button" class="font-bold text-gray-800 hover:text-rose-600 transition-colors"
+                @click="setPagValorBase(totalAgPag(agPagSelecionado))">
+                R$ {{ totalAgPag(agPagSelecionado) }}
+              </button>
+            </div>
+          </div>
+
+          <form id="form-pag-ag" @submit.prevent="confirmarPagamentoAg" class="space-y-4">
+            <div class="flex gap-3">
+              <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Desconto (R$)</label>
+                <input v-model="formPagAg.desconto" type="number" step="0.01" min="0"
+                  class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50"
+                  placeholder="0.00" />
+              </div>
+              <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Valor (R$) *</label>
+                <input v-model="formPagAg.valor" type="number" step="0.01" min="0.01" required
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                  :class="{ 'border-amber-400 bg-amber-50': Number(formPagAg.desconto) > 0 }" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Método *</label>
+              <select v-model="formPagAg.metodo" required
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                <option value="">Selecione...</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="pix">PIX</option>
+                <option value="cartao_credito">Cartão de Crédito</option>
+                <option value="cartao_debito">Cartão de Débito</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Status do agendamento</label>
+              <select v-model="formPagAg.novoStatus"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                <option value="">Manter atual</option>
+                <option value="concluido">Marcar como Concluído</option>
+                <option value="confirmado">Marcar como Confirmado</option>
+              </select>
+            </div>
+            <p v-if="erroPagAg" class="text-sm text-red-600">{{ erroPagAg }}</p>
+          </form>
+        </div>
+        <div class="flex gap-2 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+          <button type="button" @click="modalPagAberto = false" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
+          <button type="submit" form="form-pag-ag" :disabled="savingPagAg" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60">
+            {{ savingPagAg ? 'Salvando...' : 'Confirmar' }}
+          </button>
         </div>
       </div>
     </div>
@@ -551,7 +722,6 @@
               <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
                 <tr>
                   <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
-                  <th class="text-left px-4 py-3 font-medium text-gray-600">Email</th>
                   <th class="text-left px-4 py-3 font-medium text-gray-600">Telefone</th>
                   <th class="px-4 py-3"></th>
                 </tr>
@@ -559,7 +729,6 @@
               <tbody class="divide-y divide-gray-100">
                 <tr v-for="c in clientesFiltrados" :key="c.id" class="hover:bg-rose-50 cursor-pointer" @click="abrirDrawerCliente(c)">
                   <td class="px-4 py-3 font-medium text-gray-800">{{ c.nome }}</td>
-                  <td class="px-4 py-3 text-gray-500">{{ c.email || '-' }}</td>
                   <td class="px-4 py-3 text-gray-500">{{ c.telefone || '-' }}</td>
                   <td class="px-4 py-3 text-right">
                     <button class="text-xs text-red-400 hover:text-red-600" @click.stop="removerCliente(c)">Remover</button>
@@ -577,7 +746,7 @@
               >
                 <div class="min-w-0">
                   <p class="text-sm font-semibold text-gray-800">{{ c.nome }}</p>
-                  <p class="text-xs text-gray-500 mt-0.5 truncate">{{ c.telefone || c.email || 'Sem contato' }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5 truncate">{{ c.telefone || 'Sem contato' }}</p>
                 </div>
                 <div class="flex items-center gap-3 flex-shrink-0 ml-3">
                   <button
@@ -638,11 +807,6 @@
                   -->
                   <input v-model="formCliente.telefone" type="tel" inputmode="tel" class="flex-1 px-3 py-2 text-sm focus:outline-none h-full" placeholder="(11) 99999-9999" />
                 </div>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">E-mail</label>
-                <!-- type="email" abre teclado com @ e .com no mobile -->
-                <input v-model="formCliente.email" type="email" autocomplete="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 h-11" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notas do cliente</label>
@@ -779,10 +943,6 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
             <input v-model="formClienteRapido.telefone" type="tel" inputmode="tel" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 h-11" placeholder="(11) 99999-9999" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input v-model="formClienteRapido.email" type="email" autocomplete="email" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 h-11" />
-          </div>
           <p v-if="erroClienteRapido" class="text-sm text-red-500">{{ erroClienteRapido }}</p>
           <div class="flex gap-2 pt-2">
             <button type="button" class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-3 text-sm hover:bg-gray-50" @click="showModalClienteRapido = false">Cancelar</button>
@@ -861,8 +1021,10 @@ const agendamentosPendentesProximos = computed(() => {
 // isMobile é um ref reativo que rastreia a largura da janela. Não podemos
 // usar só CSS aqui porque precisamos que computed properties (como
 // calendarOptions) reajam a esta mudança e recalculem seus valores.
-const isMobile = ref(window.innerWidth < 768)
-function handleResize() { isMobile.value = window.innerWidth < 768 }
+// Breakpoint ajustado para o menu de ações entrar antes em telas médias.
+const MOBILE_BREAKPOINT = 1100
+const isMobile = ref(window.innerWidth < MOBILE_BREAKPOINT)
+function handleResize() { isMobile.value = window.innerWidth < MOBILE_BREAKPOINT }
 onMounted(() => window.addEventListener('resize', handleResize))
 onUnmounted(() => window.removeEventListener('resize', handleResize))
 
@@ -883,13 +1045,32 @@ const modalMode = ref('create')
 const saving = ref(false)
 const modalError = ref('')
 const detalheAg = ref(null)
-const formData = ref({ id: null, cliente_id: '', observacoes: '', itens: [] })
+const agParaExcluir = ref(null)
+const excluindoAg = ref(false)
+const detalheCorSelecionada = ref('#9ca3af')
+const coresFavoritas = ref([])
+
+const STATUS_LABELS = {
+  pendente: 'Pendente',
+  confirmado: 'Confirmado',
+  concluido: 'Concluído',
+  cancelado: 'Cancelado',
+}
+
+// Pagamento rápido a partir do agendamento
+const modalPagAberto = ref(false)
+const agPagSelecionado = ref(null)
+const savingPagAg = ref(false)
+const erroPagAg = ref('')
+const basePagAg = ref('0.00')
+const formPagAg = ref({ valor: '', desconto: '0.00', metodo: '', novoStatus: '' })
+const formData = ref({ id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [] })
 
 // Modal rápido de cliente dentro do agendamento
 const showModalClienteRapido = ref(false)
 const savingClienteRapido = ref(false)
 const erroClienteRapido = ref('')
-const formClienteRapido = ref({ nome: '', telefone: '', email: '' })
+const formClienteRapido = ref({ nome: '', telefone: '' })
 
 // Visão colunas por profissional
 const colunaPorProfissional = ref(false)
@@ -909,7 +1090,7 @@ const clienteSelecionadoPainel = ref(null)
 const savingCliente = ref(false)
 const erroCliente = ref('')
 const editandoCamposPainel = ref(false)
-const formCliente = ref({ nome: '', email: '', telefone: '', observacoes: '', campos_dinamicos: [] })
+const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [] })
 const historicoCliente = ref([])
 const loadingHistoricoCliente = ref(false)
 const buscaCliente = ref('')
@@ -918,6 +1099,9 @@ const buscaCliente = ref('')
 // das refs que observam, para evitar ReferenceError por TDZ)
 watch(detalheAg, (val) => { if (val) detalheTab.value = 'servicos' })
 watch(clienteDrawer, (val) => { if (val) clienteTab.value = 'dados' })
+watch(isMobile, (mobile) => {
+  if (!mobile) showMobileMenu.value = false
+})
 
 // Detalhe panel: histórico separado para não conflitar com o drawer de clientes
 const detalheClienteHistorico = ref([])
@@ -941,6 +1125,10 @@ watch(detalheAg, (ag) => {
   }
 })
 
+watch(detalheAg, (ag) => {
+  detalheCorSelecionada.value = normalizarHexColor(ag?.cor_hex) || '#9ca3af'
+})
+
 const clientesFiltrados = computed(() => {
   const q = buscaCliente.value.trim().toLowerCase()
   if (!q) return clientes.value
@@ -962,11 +1150,40 @@ function selectCliente(c) {
 }
 
 // ─── FullCalendar ──────────────────────────────────────────────────────────
-const STATUS_COLORS = {
-  pendente:   { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
-  confirmado: { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
-  concluido:  { bg: '#dcfce7', border: '#22c55e', text: '#14532d' },
-  cancelado:  { bg: '#fee2e2', border: '#ef4444', text: '#7f1d1d' },
+const DEFAULT_AGENDAMENTO_COLOR = '#9ca3af'
+
+function normalizarHexColor(value) {
+  if (!value) return null
+  const raw = String(value).trim()
+  const normalized = raw.startsWith('#') ? raw : `#${raw}`
+  return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized.toLowerCase() : null
+}
+
+function isHexCorEscura(hex) {
+  const safe = normalizarHexColor(hex) || DEFAULT_AGENDAMENTO_COLOR
+  const r = parseInt(safe.slice(1, 3), 16)
+  const g = parseInt(safe.slice(3, 5), 16)
+  const b = parseInt(safe.slice(5, 7), 16)
+  const luminancia = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminancia < 0.55
+}
+
+function corComAlpha(hex, alpha) {
+  const safe = normalizarHexColor(hex) || DEFAULT_AGENDAMENTO_COLOR
+  const r = parseInt(safe.slice(1, 3), 16)
+  const g = parseInt(safe.slice(3, 5), 16)
+  const b = parseInt(safe.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function getAgendamentoColor(ag) {
+  const bgBase = normalizarHexColor(ag?.cor_hex) || DEFAULT_AGENDAMENTO_COLOR
+  const textoEscuro = !isHexCorEscura(bgBase)
+  return {
+    bg: corComAlpha(bgBase, 0.2),
+    border: bgBase,
+    text: textoEscuro ? '#1f2937' : '#f9fafb',
+  }
 }
 
 const computedSlotMax = computed(() => {
@@ -987,7 +1204,7 @@ const calendarEvents = computed(() => {
   const events = []
   for (const ag of agendamentos.value) {
     if (q && !(ag.cliente?.nome ?? '').toLowerCase().includes(q)) continue
-    const color = STATUS_COLORS[ag.status] ?? STATUS_COLORS.pendente
+    const color = getAgendamentoColor(ag)
 
     // Agrupar itens por profissional para mesclar blocos consecutivos do mesmo atendimento
     const byProf = new Map()
@@ -1029,7 +1246,7 @@ const calendarEvents = computed(() => {
           backgroundColor: color.bg,
           borderColor: color.border,
           textColor: color.text,
-          extendedProps: { ag, servNome, profNome, profId },
+          extendedProps: { ag, servNome, profNome, profId, statusLabel: STATUS_LABELS[ag.status] ?? ag.status },
         })
       }
     }
@@ -1099,9 +1316,11 @@ const calendarOptions = computed(() => ({
   selectMirror: true,
   dayMaxEvents: true,
   weekends: true,
+  firstDay: 1,
   height: '100%',
   events: allCalendarEvents.value,
   eventClick: onEventClick,
+  eventDidMount: onEventDidMount,
   dateClick: onDateClick,
   eventContent: renderEventContent,
 }))
@@ -1130,7 +1349,7 @@ function colunaEventosDoProfissional(profId) {
     ag: ev.extendedProps.ag,
     clienteNome: ev.extendedProps.ag?.cliente?.nome ?? '—',
     servNome: ev.extendedProps.servNome,
-    color: STATUS_COLORS[ev.extendedProps.ag?.status] ?? STATUS_COLORS.pendente,
+    color: getAgendamentoColor(ev.extendedProps.ag),
     startIso: ev.start,
     endIso: ev.end,
   }))
@@ -1156,14 +1375,14 @@ function toMinutes(iso) {
 }
 
 function prevDay(dateStr) {
-  const d = new Date(dateStr)
+  const d = new Date(dateStr + 'T12:00:00')
   d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
+  return formatDateISOInSaoPaulo(d)
 }
 function nextDay(dateStr) {
-  const d = new Date(dateStr)
+  const d = new Date(dateStr + 'T12:00:00')
   d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  return formatDateISOInSaoPaulo(d)
 }
 function formatDayLabel(dateStr) {
   if (!dateStr) return ''
@@ -1234,6 +1453,12 @@ function onEventClick(info) {
   }
 }
 
+function onEventDidMount(info) {
+  if (info.event.extendedProps.tipo === 'tarefa') return
+  const statusLabel = info.event.extendedProps.statusLabel || 'Sem status'
+  info.el.title = `Status: ${statusLabel}`
+}
+
 function onDateClick(info) {
   const dt = info.dateStr.includes('T') ? info.dateStr.slice(0, 16) : info.dateStr + 'T09:00'
   abrirModalNovo(dt)
@@ -1268,7 +1493,7 @@ function abrirModalNovo(dt = '', profId = null) {
   modalMode.value = 'create'
   const item = emptyItem(dt)
   if (profId) item.profissional_id = profId
-  formData.value = { id: null, cliente_id: '', observacoes: '', itens: [item] }
+  formData.value = { id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [item] }
   clienteBuscaNome.value = ''
   modalError.value = ''
   sugestaoItemIdx.value = -1
@@ -1280,6 +1505,7 @@ function abrirModalEditar(ag) {
   formData.value = {
     id: ag.id,
     cliente_id: ag.cliente_id,
+    cor_hex: ag.cor_hex || null,
     observacoes: ag.observacoes || '',
     itens: ag.itens.map(i => ({
       servico_id: i.servico?.id ?? i.servico_id,
@@ -1474,7 +1700,7 @@ function aplicarSugestao(horaStr) {
 
 /** Abre o modal rápido de criação de cliente sem perder dados do agendamento */
 function abrirModalClienteRapido() {
-  formClienteRapido.value = { nome: '', telefone: '', email: '' }
+  formClienteRapido.value = { nome: '', telefone: '' }
   erroClienteRapido.value = ''
   showModalClienteRapido.value = true
 }
@@ -1527,7 +1753,7 @@ function statusBadgeClass(status) {
 // ─── Tarefas Internas ──────────────────────────────────────────────────────
 const colunaTarefasDoDia = computed(() =>
   tarefas.value.filter(t => {
-    const d = t.data_hora_inicio ? new Date(t.data_hora_inicio).toISOString().slice(0, 10) : ''
+    const d = t.data_hora_inicio ? formatDateISOInSaoPaulo(new Date(t.data_hora_inicio)) : ''
     return d === colunaDia.value
   })
 )
@@ -1622,6 +1848,7 @@ async function salvarModal() {
   try {
     const payload = {
       cliente_id: formData.value.cliente_id,
+      cor_hex: normalizarHexColor(formData.value.cor_hex),
       observacoes: formData.value.observacoes || null,
       itens: formData.value.itens.map(i => ({
         servico_id: i.servico_id,
@@ -1649,6 +1876,74 @@ function alterarStatus(id, status) {
   api.patch(`/agendamentos/${id}/status`, { status }).then(fetchAgendamentos)
 }
 
+function confirmarExcluirAg(ag) {
+  agParaExcluir.value = ag
+  detalheAg.value = null
+}
+
+async function excluirAgendamento() {
+  if (!agParaExcluir.value) return
+  excluindoAg.value = true
+  try {
+    await api.delete(`/agendamentos/${agParaExcluir.value.id}`)
+    agParaExcluir.value = null
+    await fetchAgendamentos()
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao excluir agendamento.')
+  } finally {
+    excluindoAg.value = false
+  }
+}
+
+function totalAgPag(ag) {
+  if (!ag?.itens) return '0.00'
+  return ag.itens.reduce((sum, item) => sum + Number(item.servico?.preco || 0), 0).toFixed(2)
+}
+
+function setPagValorBase(preco) {
+  const v = Number(preco).toFixed(2)
+  basePagAg.value = v
+  formPagAg.value.valor = v
+  formPagAg.value.desconto = '0.00'
+}
+
+function abrirModalPagamento(ag) {
+  agPagSelecionado.value = ag
+  const total = totalAgPag(ag)
+  basePagAg.value = total
+  formPagAg.value = { valor: total, desconto: '0.00', metodo: '', novoStatus: '' }
+  erroPagAg.value = ''
+  modalPagAberto.value = true
+}
+
+watch(() => formPagAg.value.desconto, (desc) => {
+  if (!agPagSelecionado.value) return
+  const newValor = Math.max(0, Number(basePagAg.value) - Number(desc)).toFixed(2)
+  if (Number(newValor) !== Number(formPagAg.value.valor)) formPagAg.value.valor = newValor
+})
+
+async function confirmarPagamentoAg() {
+  savingPagAg.value = true
+  erroPagAg.value = ''
+  try {
+    if (formPagAg.value.novoStatus) {
+      await api.patch(`/agendamentos/${agPagSelecionado.value.id}/status`, {
+        status: formPagAg.value.novoStatus,
+      })
+    }
+    await api.post(`/agendamentos/${agPagSelecionado.value.id}/pagamento`, {
+      valor: formPagAg.value.valor,
+      metodo: formPagAg.value.metodo,
+    })
+    modalPagAberto.value = false
+    await fetchAgendamentos()
+  } catch (e) {
+    erroPagAg.value = e.response?.data?.detail || 'Erro ao registrar pagamento.'
+  } finally {
+    savingPagAg.value = false
+  }
+}
+
 async function fetchAgendamentos() {
   loading.value = true
   const hoje = new Date()
@@ -1656,13 +1951,18 @@ async function fetchAgendamentos() {
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1)
   const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 4, 0)
   const params = {
-    data_inicio: inicio.toISOString().slice(0, 10),
-    data_fim: fim.toISOString().slice(0, 10),
+    data_inicio: formatDateISOInSaoPaulo(inicio),
+    data_fim: formatDateISOInSaoPaulo(fim),
   }
   if (filtroProfissional.value) params.profissional_id = filtroProfissional.value
-  const { data } = await api.get('/agendamentos/', { params })
-  agendamentos.value = data
-  loading.value = false
+  try {
+    const { data } = await api.get('/agendamentos/', { params })
+    agendamentos.value = data
+  } catch (e) {
+    console.error('Erro ao carregar agendamentos:', e)
+  } finally {
+    loading.value = false
+  }
 }
 
 watch(filtroProfissional, fetchAgendamentos)
@@ -1694,7 +1994,6 @@ function abrirDrawerCliente(cliente = null) {
   clienteSelecionadoPainel.value = cliente
   formCliente.value = {
     nome: cliente?.nome || '',
-    email: cliente?.email || '',
     telefone: cliente?.telefone || '',
     observacoes: cliente?.observacoes || '',
     campos_dinamicos: cliente?.campos_dinamicos ? JSON.parse(JSON.stringify(cliente.campos_dinamicos)) : [],
@@ -1709,7 +2008,6 @@ function abrirDrawerCliente(cliente = null) {
       clienteSelecionadoPainel.value = r.data
       formCliente.value = {
         nome: r.data.nome || '',
-        email: r.data.email || '',
         telefone: r.data.telefone || '',
         observacoes: r.data.observacoes || '',
         campos_dinamicos: r.data.campos_dinamicos ? JSON.parse(JSON.stringify(r.data.campos_dinamicos)) : [],
@@ -1735,7 +2033,6 @@ async function salvarCliente() {
   try {
     const payload = {
       nome: formCliente.value.nome,
-      email: formCliente.value.email || null,
       telefone: formCliente.value.telefone || null,
       observacoes: formCliente.value.observacoes || null,
       campos_dinamicos: formCliente.value.campos_dinamicos.length ? formCliente.value.campos_dinamicos : null,
@@ -1773,14 +2070,60 @@ async function fetchClientes() {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+function formatDateISOInSaoPaulo(value) {
+  const d = value instanceof Date ? value : new Date(value)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)
+}
+
 function toDatetimeLocal(iso) {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0') + 'T' +
-    String(d.getHours()).padStart(2, '0') + ':' +
-    String(d.getMinutes()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d)
+  const get = (type) => parts.find(p => p.type === type)?.value || '00'
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+}
+
+function carregarCoresFavoritas() {
+  try {
+    const raw = localStorage.getItem('agendamento-cores-favoritas')
+    const list = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(list)) return
+    coresFavoritas.value = list
+      .map(c => normalizarHexColor(c))
+      .filter(Boolean)
+      .slice(0, 20)
+  } catch {
+    coresFavoritas.value = []
+  }
+}
+
+function salvarCorFavorita() {
+  const cor = normalizarHexColor(detalheCorSelecionada.value)
+  if (!cor) return
+  const merged = [cor, ...coresFavoritas.value.filter(c => c !== cor)].slice(0, 20)
+  coresFavoritas.value = merged
+  localStorage.setItem('agendamento-cores-favoritas', JSON.stringify(merged))
+}
+
+async function salvarCorAgendamento() {
+  if (!detalheAg.value?.id) return
+  const cor = normalizarHexColor(detalheCorSelecionada.value)
+  try {
+    await api.patch(`/agendamentos/${detalheAg.value.id}/cor`, { cor_hex: cor })
+    detalheAg.value.cor_hex = cor
+    await fetchAgendamentos()
+    toastSucesso('Cor do agendamento atualizada!')
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao salvar cor do agendamento.')
+  }
 }
 
 function formatDate(iso) {
@@ -1801,7 +2144,10 @@ async function fetchReferencias() {
   } catch (e) { console.error('Erro ao carregar referências:', e) }
 }
 
-onMounted(() => Promise.all([fetchAgendamentos(), fetchClientes(), fetchReferencias(), fetchTarefas()]))
+onMounted(() => {
+  carregarCoresFavoritas()
+  return Promise.all([fetchAgendamentos(), fetchClientes(), fetchReferencias(), fetchTarefas()])
+})
 </script>
 
 <style>

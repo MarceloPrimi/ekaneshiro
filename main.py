@@ -9,6 +9,7 @@ from api.rotas_agendamentos import router as agendamentos_router
 from api.rotas_relatorios import router as relatorios_router
 from api.rotas_produtos import router as produtos_router
 from api.rotas_tarefas import router as tarefas_router
+from api.rotas_secoes import router as secoes_router
 
 from core.config import settings
 
@@ -40,6 +41,7 @@ app.include_router(agendamentos_router)
 app.include_router(relatorios_router)
 app.include_router(produtos_router)
 app.include_router(tarefas_router)
+app.include_router(secoes_router)
 
 
 @app.get("/health", tags=["Status"])

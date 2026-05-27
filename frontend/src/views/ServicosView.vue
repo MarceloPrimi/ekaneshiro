@@ -11,16 +11,99 @@
       </button>
     </div>
 
+    <!-- Painel de Seções -->
+    <div v-if="auth.isAdmin" class="mb-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        @click="gerenciandoSecoes = !gerenciandoSecoes"
+        class="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <span class="flex items-center gap-2">
+          <span class="text-gray-400">▤</span>
+          Seções
+          <span class="ml-1 text-xs font-normal text-gray-400">({{ secoes.length }})</span>
+        </span>
+        <svg :class="gerenciandoSecoes ? 'rotate-180' : ''" class="w-4 h-4 text-gray-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div v-if="gerenciandoSecoes" class="border-t border-gray-100 px-4 py-4 space-y-3">
+        <div v-if="!secoes.length" class="text-sm text-gray-400 italic">Nenhuma seção cadastrada.</div>
+        <div v-else class="flex flex-wrap gap-2">
+          <span
+            v-for="sec in secoes"
+            :key="sec.id"
+            class="flex items-center gap-1.5 bg-rose-50 text-rose-700 text-xs font-medium px-3 py-1.5 rounded-full"
+          >
+            {{ sec.nome }}
+            <button @click="excluirSecao(sec)" class="hover:text-red-700 ml-0.5" title="Excluir seção">✕</button>
+          </span>
+        </div>
+        <form @submit.prevent="criarSecao" class="flex gap-2 mt-2">
+          <input
+            v-model="novaSecao"
+            placeholder="Nova seção (ex: Corte, Manicure...)"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+          />
+          <button
+            type="submit"
+            :disabled="salvandoSecao || !novaSecao.trim()"
+            class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+          >+ Criar</button>
+        </form>
+        <p v-if="erroSecao" class="text-xs text-red-600">{{ erroSecao }}</p>
+      </div>
+    </div>
+
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div v-if="!loading && servicos.length" class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100">
+        <select v-model="filtroSecao" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-rose-400 bg-white">
+          <option :value="null">Todas as seções</option>
+          <option v-for="sec in secoes" :key="sec.id" :value="sec.id">{{ sec.nome }}</option>
+          <option :value="0">Sem seção</option>
+        </select>
+        <span class="text-xs text-gray-400">{{ servicosFiltrados.length }} resultado(s)</span>
+      </div>
+      <div v-if="selecaoIds.length" class="flex flex-wrap items-center gap-3 px-4 py-3 bg-rose-50 border-b border-rose-100">
+        <span class="text-sm font-medium text-rose-700">{{ selecaoIds.length }} selecionado(s)</span>
+        <select v-model="bulkAtribuirSecaoId" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 bg-white">
+          <option :value="null">Atribuir seção…</option>
+          <option v-for="sec in secoes" :key="sec.id" :value="sec.id">{{ sec.nome }}</option>
+          <option :value="0">Remover seção</option>
+        </select>
+        <button
+          :disabled="bulkAtribuirSecaoId === null || salvandoBulk"
+          @click="aplicarBulkSecao"
+          class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50"
+        >{{ salvandoBulk ? 'Aplicando...' : 'Aplicar' }}</button>
+        <button
+          v-if="auth.isAdmin"
+          :disabled="salvandoBulk"
+          @click="inativarBulkServicos"
+          class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50"
+        >{{ salvandoBulk ? 'Aplicando...' : 'Inativar selecionados' }}</button>
+        <button
+          v-if="auth.isAdmin"
+          :disabled="salvandoBulk"
+          @click="excluirBulkServicos"
+          class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50"
+        >{{ salvandoBulk ? 'Aplicando...' : 'Excluir selecionados' }}</button>
+        <button @click="selecaoIds = []" class="text-sm text-gray-500 hover:text-gray-700 ml-auto">Limpar</button>
+      </div>
       <div v-if="loading" class="p-8 text-center text-sm text-gray-400">Carregando...</div>
       <div v-else-if="!servicos.length" class="p-8 text-center text-sm text-gray-400">Nenhum serviço cadastrado.</div>
 
       <!-- Mobile: cards -->
       <div v-else class="sm:hidden divide-y divide-gray-100">
-        <div v-for="s in servicos" :key="s.id" class="p-4">
-          <div class="flex items-start justify-between gap-2 mb-1">
-            <p class="font-medium text-gray-800 text-sm">{{ s.nome }}</p>
-            <span :class="s.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0">{{ s.ativo ? 'Ativo' : 'Inativo' }}</span>
+        <div v-for="s in servicosFiltrados" :key="s.id" class="p-4">
+          <div class="flex items-start gap-3 mb-1">
+            <input type="checkbox" :value="s.id" v-model="selecaoIds" class="accent-rose-600 mt-1 flex-shrink-0" />
+            <div class="flex-1 flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-gray-800 text-sm">{{ s.nome }}</p>
+                <span v-if="s.secao_id" class="text-xs text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full font-medium">{{ nomeSecao(s.secao_id) }}</span>
+              </div>
+              <span :class="s.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0">{{ s.ativo ? 'Ativo' : 'Inativo' }}</span>
+            </div>
           </div>
           <p v-if="s.descricao" class="text-xs text-gray-400 mb-1">{{ s.descricao }}</p>
           <div class="flex items-center gap-3 text-xs text-gray-500 mb-3">
@@ -40,7 +123,11 @@
       <table v-if="!loading && servicos.length" class="hidden sm:table w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
+            <th class="px-4 py-3 w-10">
+              <input type="checkbox" :checked="todosSelecionados" @change="toggleSelecionarTodos" class="accent-rose-600" />
+            </th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-600">Seção</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Descrição</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Duração</th>
             <th class="text-left px-4 py-3 font-medium text-gray-600">Valor Base</th>
@@ -50,8 +137,15 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <tr v-for="s in servicos" :key="s.id" class="hover:bg-gray-50">
+          <tr v-for="s in servicosFiltrados" :key="s.id" class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <input type="checkbox" :value="s.id" v-model="selecaoIds" class="accent-rose-600" />
+            </td>
             <td class="px-4 py-3 font-medium text-gray-800">{{ s.nome }}</td>
+            <td class="px-4 py-3">
+              <span v-if="s.secao_id" class="text-xs text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full font-medium">{{ nomeSecao(s.secao_id) }}</span>
+              <span v-else class="text-gray-300 text-xs">—</span>
+            </td>
             <td class="px-4 py-3 text-gray-500">{{ s.descricao || '-' }}</td>
             <td class="px-4 py-3 text-gray-500">{{ s.duracao_minutos }} min</td>
             <td class="px-4 py-3 text-gray-700">R$ {{ Number(s.preco).toFixed(2) }}</td>
@@ -114,6 +208,13 @@
               </div>
             </div>
           </div>
+          <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Seção <span class="text-gray-400 font-normal">(opcional)</span></label>
+              <select v-model="form.secao_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400">
+                <option :value="null">Sem seção</option>
+                <option v-for="sec in secoes" :key="sec.id" :value="sec.id">{{ sec.nome }}</option>
+              </select>
+            </div>
           <p v-if="erro" class="text-sm text-red-600">{{ erro }}</p>
           </form>
         </div>
@@ -171,6 +272,13 @@
               <option :value="false">Inativo</option>
             </select>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Seção <span class="text-gray-400 font-normal">(opcional)</span></label>
+            <select v-model="formEditar.secao_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400">
+              <option :value="null">Sem seção</option>
+              <option v-for="sec in secoes" :key="sec.id" :value="sec.id">{{ sec.nome }}</option>
+            </select>
+          </div>
           <p v-if="erroEditar" class="text-sm text-red-600">{{ erroEditar }}</p>
           </form>
         </div>
@@ -201,7 +309,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 
@@ -218,8 +326,140 @@ const erro = ref('')
 const erroEditar = ref('')
 const editandoId = ref(null)
 const servicoParaExcluir = ref(null)
-const form = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null })
-const formEditar = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null, ativo: true })
+const form = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null, secao_id: null })
+const formEditar = ref({ nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null, ativo: true, secao_id: null })
+
+// ─── Seções ───────────────────────────────────────────────────────────────
+const secoes = ref([])
+const gerenciandoSecoes = ref(false)
+const novaSecao = ref('')
+const salvandoSecao = ref(false)
+const erroSecao = ref('')
+
+async function fetchSecoes() {
+  try {
+    const { data } = await api.get('/secoes/')
+    secoes.value = data
+  } catch {
+    // silencioso
+  }
+}
+
+async function criarSecao() {
+  if (!novaSecao.value.trim()) return
+  salvandoSecao.value = true
+  erroSecao.value = ''
+  try {
+    await api.post('/secoes/', { nome: novaSecao.value.trim() })
+    novaSecao.value = ''
+    toastSucesso('Seção criada!')
+    await fetchSecoes()
+  } catch (e) {
+    erroSecao.value = e.response?.data?.detail || 'Erro ao criar seção.'
+  } finally {
+    salvandoSecao.value = false
+  }
+}
+
+async function excluirSecao(secao) {
+  if (!confirm(`Excluir a seção "${secao.nome}"? Os serviços vinculados ficarão sem seção.`)) return
+  try {
+    await api.delete(`/secoes/${secao.id}`)
+    toastSucesso('Seção excluída.')
+    await fetchSecoes()
+    await fetchServicos()
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao excluir seção.')
+  }
+}
+
+function nomeSecao(id) {
+  return secoes.value.find(s => s.id === id)?.nome ?? '—'
+}
+// ──────────────────────────────────────────────────────────────────────────
+
+// ─── Seleção + filtro ──────────────────────────────────────────────────────
+const filtroSecao = ref(null)   // null = todas, 0 = sem seção, N = id da seção
+const selecaoIds = ref([])      // IDs dos serviços selecionados
+const bulkAtribuirSecaoId = ref(null)
+const salvandoBulk = ref(false)
+
+const servicosFiltrados = computed(() => {
+  if (filtroSecao.value === null) return servicos.value
+  if (filtroSecao.value === 0)    return servicos.value.filter(s => !s.secao_id)
+  return servicos.value.filter(s => s.secao_id === filtroSecao.value)
+})
+
+const todosSelecionados = computed(() => {
+  const ids = servicosFiltrados.value.map(s => s.id)
+  return ids.length > 0 && ids.every(id => selecaoIds.value.includes(id))
+})
+
+function toggleSelecionarTodos() {
+  const ids = servicosFiltrados.value.map(s => s.id)
+  if (todosSelecionados.value) {
+    selecaoIds.value = selecaoIds.value.filter(id => !ids.includes(id))
+  } else {
+    selecaoIds.value = [...new Set([...selecaoIds.value, ...ids])]
+  }
+}
+
+async function aplicarBulkSecao() {
+  if (bulkAtribuirSecaoId.value === null) return
+  salvandoBulk.value = true
+  try {
+    await Promise.all(
+      selecaoIds.value.map(id =>
+        api.patch(`/servicos/${id}`, { secao_id: bulkAtribuirSecaoId.value === 0 ? null : bulkAtribuirSecaoId.value })
+      )
+    )
+    toastSucesso('Seção atribuída com sucesso!')
+    selecaoIds.value = []
+    bulkAtribuirSecaoId.value = null
+    await fetchServicos()
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao atualizar seções.')
+  } finally {
+    salvandoBulk.value = false
+  }
+}
+
+async function inativarBulkServicos() {
+  if (!selecaoIds.value.length) return
+  if (!confirm(`Inativar ${selecaoIds.value.length} serviço(s) selecionado(s)?`)) return
+  salvandoBulk.value = true
+  try {
+    await Promise.all(
+      selecaoIds.value.map(id => api.patch(`/servicos/${id}`, { ativo: false }))
+    )
+    toastSucesso('Serviços inativados com sucesso!')
+    selecaoIds.value = []
+    await fetchServicos()
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao inativar serviços selecionados.')
+  } finally {
+    salvandoBulk.value = false
+  }
+}
+
+async function excluirBulkServicos() {
+  if (!selecaoIds.value.length) return
+  if (!confirm(`Excluir ${selecaoIds.value.length} serviço(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return
+  salvandoBulk.value = true
+  try {
+    await Promise.all(
+      selecaoIds.value.map(id => api.delete(`/servicos/${id}`))
+    )
+    toastSucesso('Serviços excluídos com sucesso!')
+    selecaoIds.value = []
+    await fetchServicos()
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Erro ao excluir serviços selecionados.')
+  } finally {
+    salvandoBulk.value = false
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 async function fetchServicos() {
   loading.value = true
@@ -231,10 +471,13 @@ async function fetchServicos() {
   }
 }
 
-onMounted(fetchServicos)
+onMounted(() => {
+  fetchServicos()
+  fetchSecoes()
+})
 
 function abrirModal() {
-  form.value = { nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null }
+  form.value = { nome: '', descricao: '', duracao_minutos: null, preco: '', preco_minimo: null, preco_maximo: null, secao_id: null }
   erro.value = ''
   modalAberto.value = true
 }
@@ -253,6 +496,7 @@ function abrirModalEditar(s) {
     preco_minimo: s.preco_minimo ?? null,
     preco_maximo: s.preco_maximo ?? null,
     ativo: s.ativo,
+    secao_id: s.secao_id ?? null,
   }
   erroEditar.value = ''
   modalEditar.value = true
@@ -273,6 +517,7 @@ async function salvar() {
       preco: form.value.preco,
       preco_minimo: form.value.preco_minimo || null,
       preco_maximo: form.value.preco_maximo || null,
+      secao_id: form.value.secao_id || null,
     })
     fecharModal()
     toastSucesso('Serviço criado com sucesso!')

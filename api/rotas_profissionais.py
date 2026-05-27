@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencias import get_current_admin, get_current_user
 from db.database import get_db
-from db.models import ItemAgendamento, Profissional, ProfissionalServico, RoleEnum, Servico, Usuario
+from db.models import ItemAgendamento, Profissional, ProfissionalSecao, ProfissionalServico, RoleEnum, Secao, Servico, Usuario
 from schemas.profissionais import (
     ProfissionalComServicosResponse,
     ProfissionalCreate,
@@ -14,6 +14,7 @@ from schemas.profissionais import (
     ProfissionalServicoPrecoUpdate,
     ProfissionalUpdate,
 )
+from schemas.secoes import SecaoResponse, SecaosProfissionalUpdate
 
 router = APIRouter(prefix="/profissionais", tags=["Profissionais"])
 
@@ -36,8 +37,14 @@ def criar_profissional(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um profissional cadastrado com este nome.",
         )
-    novo = Profissional(**payload.model_dump())
+    dados = payload.model_dump(exclude={"secao_ids"})
+    novo = Profissional(**dados)
     db.add(novo)
+    db.flush()  # obtém o id antes do commit
+    if payload.secao_ids:
+        secoes = db.query(Secao).filter(Secao.id.in_(payload.secao_ids)).all()
+        for secao in secoes:
+            db.add(ProfissionalSecao(profissional_id=novo.id, secao_id=secao.id))
     db.commit()
     db.refresh(novo)
     return novo
@@ -91,7 +98,7 @@ def atualizar_profissional(
             status_code=status.HTTP_404_NOT_FOUND, detail="Profissional não encontrado."
         )
 
-    update_data = payload.model_dump(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True, exclude={"secao_ids"})
 
     # Validar vínculo de usuário quando explicitamente fornecido
     if "usuario_id" in update_data and update_data["usuario_id"] is not None:
@@ -249,3 +256,74 @@ def atualizar_preco_proprio(
         )
     vinculo.preco_proprio = payload.preco_proprio
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Seções do profissional
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{profissional_id}/secoes",
+    response_model=list[SecaoResponse],
+    summary="Listar seções do profissional",
+)
+def listar_secoes_profissional(
+    profissional_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, Depends(get_current_user)],
+):
+    profissional = db.query(Profissional).filter(Profissional.id == profissional_id).first()
+    if not profissional:
+        raise HTTPException(status_code=404, detail="Profissional não encontrado.")
+    return [ps.secao for ps in profissional.secoes]
+
+
+@router.put(
+    "/{profissional_id}/secoes",
+    response_model=list[SecaoResponse],
+    summary="Definir seções do profissional (substitui a lista atual)",
+)
+def definir_secoes_profissional(
+    profissional_id: int,
+    payload: SecaosProfissionalUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, Depends(get_current_admin)],
+):
+    profissional = db.query(Profissional).filter(Profissional.id == profissional_id).first()
+    if not profissional:
+        raise HTTPException(status_code=404, detail="Profissional não encontrado.")
+
+    secoes = db.query(Secao).filter(Secao.id.in_(payload.secao_ids)).all()
+    if len(secoes) != len(payload.secao_ids):
+        raise HTTPException(status_code=400, detail="Uma ou mais seções não encontradas.")
+
+    db.query(ProfissionalSecao).filter_by(profissional_id=profissional_id).delete()
+    for secao in secoes:
+        db.add(ProfissionalSecao(profissional_id=profissional_id, secao_id=secao.id))
+
+    # Auto-sync: replace profissional's services with all services from selected sections
+    secao_ids = [s.id for s in secoes]
+    servicos_das_secoes = (
+        db.query(Servico).filter(Servico.secao_id.in_(secao_ids)).all()
+        if secao_ids else []
+    )
+    servico_ids_novos = {s.id for s in servicos_das_secoes}
+
+    # Remove services no longer in selected sections
+    vinculos_atuais = (
+        db.query(ProfissionalServico).filter_by(profissional_id=profissional_id).all()
+    )
+    for v in vinculos_atuais:
+        if v.servico_id not in servico_ids_novos:
+            db.delete(v)
+
+    # Add new services not yet linked
+    ids_atuais = {v.servico_id for v in vinculos_atuais}
+    for sid in servico_ids_novos:
+        if sid not in ids_atuais:
+            db.add(ProfissionalServico(profissional_id=profissional_id, servico_id=sid))
+
+    db.commit()
+    db.refresh(profissional)
+    return [ps.secao for ps in profissional.secoes]

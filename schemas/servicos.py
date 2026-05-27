@@ -9,6 +9,7 @@ class ServicoCreate(BaseModel):
     preco: Decimal
     preco_minimo: Decimal | None = None
     preco_maximo: Decimal | None = None
+    secao_id: int | None = None
 
 
 class ServicoUpdate(BaseModel):
@@ -19,6 +20,7 @@ class ServicoUpdate(BaseModel):
     preco_minimo: Decimal | None = None
     preco_maximo: Decimal | None = None
     ativo: bool | None = None
+    secao_id: int | None = None
 
 
 class ServicoResponse(BaseModel):
@@ -32,3 +34,4 @@ class ServicoResponse(BaseModel):
     preco_minimo: Decimal | None = None
     preco_maximo: Decimal | None = None
     ativo: bool
+    secao_id: int | None = None

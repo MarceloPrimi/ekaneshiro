@@ -122,6 +122,11 @@
             class="flex-1 py-3 text-sm transition-colors"
           >Contato</button>
           <button
+            @click="drawerTab = 'secoes'"
+            :class="drawerTab === 'secoes' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition-colors"
+          >Seções</button>
+          <button
             @click="drawerTab = 'servicos'"
             :class="drawerTab === 'servicos' ? 'border-b-2 border-rose-600 text-rose-700 font-semibold' : 'text-gray-500'"
             class="flex-1 py-3 text-sm transition-colors"
@@ -148,30 +153,48 @@
             <button type="button" class="w-full border border-gray-200 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50" @click="drawerDetalhes = false">Fechar</button>
           </div>
 
-          <!-- Direita: serviços e preços -->
-          <div :class="['flex-1 overflow-y-auto p-5', drawerTab !== 'servicos' ? 'hidden sm:block' : '']">
-            <h4 class="text-sm font-semibold text-gray-700 mb-4">Serviços habilitados</h4>
+          <!-- Direita: seções + serviços e preços -->
+          <div :class="['flex-1 overflow-y-auto p-5 space-y-6', (drawerTab !== 'servicos' && drawerTab !== 'secoes') ? 'hidden sm:block' : '']">
 
-            <div v-if="!profSelecionado?.servicos?.length" class="text-sm text-gray-400 italic">Nenhum serviço habilitado.</div>
-
-            <div
-              v-for="s in profSelecionado?.servicos"
-              :key="s.id"
-              class="mb-3 bg-gray-50 rounded-xl p-3.5 border border-gray-100 flex items-center justify-between gap-3"
-            >
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-gray-800">{{ s.nome }}</p>
-                <p class="text-xs text-gray-400 mt-0.5">{{ s.duracao_minutos }} min</p>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <p class="text-sm font-semibold" :class="s.preco_proprio != null ? 'text-rose-600' : 'text-gray-700'">
-                  R$ {{ Number(s.preco_proprio ?? s.preco).toFixed(2) }}
-                </p>
-                <p v-if="s.preco_proprio != null" class="text-xs text-gray-400 line-through">
-                  R$ {{ Number(s.preco).toFixed(2) }}
-                </p>
+            <!-- Seções (desktop sempre visível; mobile quando aba = secoes) -->
+            <div :class="drawerTab === 'servicos' ? 'hidden sm:block' : ''">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3">Seções atendidas</h4>
+              <div v-if="!profSelecionado?.secoes?.length" class="text-sm text-gray-400 italic">Nenhuma seção atribuída.</div>
+              <div v-else class="flex flex-wrap gap-2">
+                <span
+                  v-for="sec in profSelecionado.secoes"
+                  :key="sec.id"
+                  class="text-xs font-medium bg-rose-50 text-rose-700 px-3 py-1.5 rounded-full"
+                >{{ sec.nome }}</span>
               </div>
             </div>
+
+            <!-- Serviços (desktop sempre visível; mobile quando aba = servicos) -->
+            <div :class="drawerTab === 'secoes' ? 'hidden sm:block' : ''">
+              <h4 class="text-sm font-semibold text-gray-700 mb-4">Serviços habilitados</h4>
+
+              <div v-if="!profSelecionado?.servicos?.length" class="text-sm text-gray-400 italic">Nenhum serviço habilitado.</div>
+
+              <div
+                v-for="s in profSelecionado?.servicos"
+                :key="s.id"
+                class="mb-3 bg-gray-50 rounded-xl p-3.5 border border-gray-100 flex items-center justify-between gap-3"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-800">{{ s.nome }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ s.duracao_minutos }} min</p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  <p class="text-sm font-semibold" :class="s.preco_proprio != null ? 'text-rose-600' : 'text-gray-700'">
+                    R$ {{ Number(s.preco_proprio ?? s.preco).toFixed(2) }}
+                  </p>
+                  <p v-if="s.preco_proprio != null" class="text-xs text-gray-400 line-through">
+                    R$ {{ Number(s.preco).toFixed(2) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -192,18 +215,32 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Serviços</label>
-              <div v-if="!servicosDisponiveis.length" class="text-xs text-gray-400">Nenhum serviço cadastrado.</div>
-              <div v-else class="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Seções</label>
+              <div v-if="!secoesDisponiveis.length" class="text-xs text-gray-400">Nenhuma seção cadastrada.</div>
+              <div v-else class="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2">
                 <label
-                  v-for="s in servicosDisponiveis"
-                  :key="s.id"
+                  v-for="sec in secoesDisponiveis"
+                  :key="sec.id"
                   class="flex items-center gap-2 px-1 py-1 rounded hover:bg-gray-50 cursor-pointer"
                 >
-                  <input type="checkbox" :value="s.id" v-model="form.servico_ids" class="accent-rose-600" />
+                  <input type="checkbox" :value="sec.id" v-model="form.secao_ids" class="accent-rose-600" />
+                  <span class="text-sm text-gray-700">{{ sec.nome }}</span>
+                </label>
+              </div>
+            </div>
+
+            <div v-if="form.secao_ids.length">
+              <label class="block text-sm font-medium text-gray-500 mb-2">Serviços desta seção</label>
+              <div v-if="!servicosDasSecoes(form.secao_ids).length" class="text-xs text-gray-400 italic">Nenhum serviço nas seções selecionadas.</div>
+              <div v-else class="space-y-0.5 max-h-40 overflow-y-auto border border-gray-100 bg-gray-50 rounded-lg p-2">
+                <div
+                  v-for="s in servicosDasSecoes(form.secao_ids)"
+                  :key="s.id"
+                  class="flex items-center gap-2 px-1 py-1.5"
+                >
                   <span class="text-sm text-gray-700">{{ s.nome }}</span>
                   <span class="text-xs text-gray-400 ml-auto">{{ s.duracao_minutos }}min · R$ {{ Number(s.preco).toFixed(2) }}</span>
-                </label>
+                </div>
               </div>
             </div>
 
@@ -254,18 +291,31 @@
             <p class="text-xs text-gray-400 mt-1">Vincule um usuário com perfil 'profissional' para que ele veja apenas seus próprios agendamentos ao logar.</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Serviços habilitados</label>
-            <div v-if="!servicosDisponiveis.length" class="text-xs text-gray-400">Nenhum serviço cadastrado.</div>
-            <div v-else class="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Seções</label>
+            <div v-if="!secoesDisponiveis.length" class="text-xs text-gray-400">Nenhuma seção cadastrada.</div>
+            <div v-else class="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2">
               <label
-                v-for="s in servicosDisponiveis"
-                :key="s.id"
+                v-for="sec in secoesDisponiveis"
+                :key="sec.id"
                 class="flex items-center gap-2 px-1 py-1 rounded hover:bg-gray-50 cursor-pointer"
               >
-                <input type="checkbox" :value="s.id" v-model="formEditar.servico_ids" class="accent-rose-600" />
+                <input type="checkbox" :value="sec.id" v-model="formEditar.secao_ids" class="accent-rose-600" />
+                <span class="text-sm text-gray-700">{{ sec.nome }}</span>
+              </label>
+            </div>
+          </div>
+          <div v-if="formEditar.secao_ids.length">
+            <label class="block text-sm font-medium text-gray-500 mb-2">Serviços desta seção</label>
+            <div v-if="!servicosDasSecoes(formEditar.secao_ids).length" class="text-xs text-gray-400 italic">Nenhum serviço nas seções selecionadas.</div>
+            <div v-else class="space-y-0.5 max-h-40 overflow-y-auto border border-gray-100 bg-gray-50 rounded-lg p-2">
+              <div
+                v-for="s in servicosDasSecoes(formEditar.secao_ids)"
+                :key="s.id"
+                class="flex items-center gap-2 px-1 py-1.5"
+              >
                 <span class="text-sm text-gray-700">{{ s.nome }}</span>
                 <span class="text-xs text-gray-400 ml-auto">{{ s.duracao_minutos }}min · R$ {{ Number(s.preco).toFixed(2) }}</span>
-              </label>
+              </div>
             </div>
           </div>
           <div>
@@ -384,6 +434,7 @@ const auth = useAuthStore()
 const profissionais = ref([])
 const usuariosProfissionais = ref([])
 const servicosDisponiveis = ref([])
+const secoesDisponiveis = ref([])
 const loading = ref(true)
 const modalAberto = ref(false)
 const modalEditar = ref(false)
@@ -391,10 +442,14 @@ const salvando = ref(false)
 const erro = ref('')
 const erroEditar = ref('')
 const editandoId = ref(null)
-const editandoServicosOriginais = ref([])
 const profissionalParaExcluir = ref(null)
-const form = ref({ nome: '', servico_ids: [] })
-const formEditar = ref({ nome: '', ativo: true, servico_ids: [], usuario_id: null, telefone: '', chave_pix: '' })
+const form = ref({ nome: '', secao_ids: [] })
+const formEditar = ref({ nome: '', ativo: true, secao_ids: [], usuario_id: null, telefone: '', chave_pix: '' })
+
+function servicosDasSecoes(secaoIds) {
+  if (!secaoIds.length) return []
+  return servicosDisponiveis.value.filter(s => secaoIds.includes(s.secao_id))
+}
 
 // ─── Preços por profissional ───────────────────────────────────────────────
 const modalPrecos = ref(false)
@@ -483,6 +538,15 @@ async function fetchServicos() {
   }
 }
 
+async function fetchSecoes() {
+  try {
+    const { data } = await api.get('/secoes/')
+    secoesDisponiveis.value = data
+  } catch {
+    // silencioso
+  }
+}
+
 async function fetchUsuariosProfissionais() {
   if (!auth.isAdmin) return
   try {
@@ -496,11 +560,12 @@ async function fetchUsuariosProfissionais() {
 onMounted(() => {
   fetchProfissionais()
   fetchServicos()
+  fetchSecoes()
   fetchUsuariosProfissionais()
 })
 
 function abrirModal() {
-  form.value = { nome: '', servico_ids: [] }
+  form.value = { nome: '', secao_ids: [] }
   erro.value = ''
   modalAberto.value = true
 }
@@ -511,9 +576,14 @@ function fecharModal() {
 
 function abrirModalEditar(p) {
   editandoId.value = p.id
-  const idsAtuais = (p.servicos || []).map(s => s.id)
-  editandoServicosOriginais.value = [...idsAtuais]
-  formEditar.value = { nome: p.nome, ativo: p.ativo, servico_ids: [...idsAtuais], usuario_id: p.usuario_id ?? null, telefone: p.telefone || '', chave_pix: p.chave_pix || '' }
+  formEditar.value = {
+    nome: p.nome,
+    ativo: p.ativo,
+    secao_ids: (p.secoes || []).map(s => s.id),
+    usuario_id: p.usuario_id ?? null,
+    telefone: p.telefone || '',
+    chave_pix: p.chave_pix || '',
+  }
   erroEditar.value = ''
   modalEditar.value = true
 }
@@ -527,11 +597,9 @@ async function salvar() {
   erro.value = ''
   try {
     const { data: novo } = await api.post('/profissionais/', { nome: form.value.nome })
-    await Promise.all(
-      form.value.servico_ids.map(sid =>
-        api.post(`/profissionais/${novo.id}/servicos/${sid}`)
-      )
-    )
+    if (form.value.secao_ids.length) {
+      await api.put(`/profissionais/${novo.id}/secoes`, { secao_ids: form.value.secao_ids })
+    }
     fecharModal()
     toastSucesso('Profissional criado com sucesso!')
     await fetchProfissionais()
@@ -551,18 +619,10 @@ async function salvarEdicao() {
       telefone: formEditar.value.telefone || null,
       chave_pix: formEditar.value.chave_pix || null,
     })
-    const originais = new Set(editandoServicosOriginais.value)
-    const novos = new Set(formEditar.value.servico_ids)
-    const adicionar = [...novos].filter(id => !originais.has(id))
-    const remover = [...originais].filter(id => !novos.has(id))
-    await Promise.all([
-      ...adicionar.map(sid => api.post(`/profissionais/${editandoId.value}/servicos/${sid}`)),
-      ...remover.map(sid => api.delete(`/profissionais/${editandoId.value}/servicos/${sid}`)),
-    ])
+    await api.put(`/profissionais/${editandoId.value}/secoes`, { secao_ids: formEditar.value.secao_ids })
     modalEditar.value = false
     toastSucesso('Profissional atualizado com sucesso!')
     await fetchProfissionais()
-    // Se o drawer estava aberto para este profissional, atualiza o objeto exibido
     if (profSelecionado.value?.id === editandoId.value) {
       profSelecionado.value = profissionais.value.find(p => p.id === editandoId.value) ?? profSelecionado.value
     }

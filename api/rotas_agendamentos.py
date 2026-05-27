@@ -13,6 +13,7 @@ from api.dependencias import (
 from db.database import get_db
 from db.models import Agendamento, ItemAgendamento, RoleEnum, StatusAgendamentoEnum, Usuario
 from schemas.agendamentos import (
+    AgendamentoCorUpdate,
     AgendamentoCreate,
     AgendamentoResponse,
     AgendamentoStatusUpdate,
@@ -176,6 +177,21 @@ def atualizar_status(
     return agendamento_service.atualizar_status(db, agendamento, payload.status)
 
 
+@router.patch(
+    "/{agendamento_id}/cor",
+    response_model=AgendamentoResponse,
+    summary="Atualizar cor personalizada do agendamento",
+)
+def atualizar_cor_agendamento(
+    agendamento_id: int,
+    payload: AgendamentoCorUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+):
+    agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    return agendamento_service.atualizar_cor(db, agendamento, payload.cor_hex)
+
+
 @router.post(
     "/{agendamento_id}/pagamento",
     response_model=PagamentoResponse,
@@ -192,3 +208,18 @@ def registrar_pagamento(
     return agendamento_service.registrar_pagamento(
         db, agendamento, payload, registrado_por_id=current_user.id
     )
+
+
+@router.delete(
+    "/{agendamento_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Excluir agendamento",
+)
+def excluir_agendamento(
+    agendamento_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+):
+    agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    db.delete(agendamento)
+    db.commit()

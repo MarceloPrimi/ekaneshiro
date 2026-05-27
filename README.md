@@ -111,11 +111,9 @@ GOOGLE_SPREADSHEET_ID=
 alembic upgrade head
 ```
 
-**5. (Opcional) Popule dados iniciais**
+**5. Crie o primeiro usuário admin (quando necessário)**
 
-```bash
-python seed.py
-```
+Como o bootstrap de usuário inicial não deve ficar versionado, crie o admin por script local privado ou diretamente no banco para ambientes novos.
 
 **6. Suba o servidor**
 
