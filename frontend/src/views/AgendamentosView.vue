@@ -542,7 +542,6 @@
               Editar Agendamento
             </button>
             <button
-              v-if="!detalheAg.pagamento && detalheAg.status !== 'cancelado'"
               @click="abrirModalPagamento(detalheAg); detalheAg = null"
               class="w-full border border-green-300 text-green-700 rounded-xl py-3 text-sm font-semibold hover:bg-green-50 transition-colors mb-2"
             >
@@ -1944,12 +1943,18 @@ async function confirmarPagamentoAg() {
   }
 }
 
-async function fetchAgendamentos() {
-  loading.value = true
+async function fetchAgendamentos(options = {}) {
+  const {
+    silent = false,
+    mesesPassados = 3,
+    mesesFuturos = 4,
+  } = options
+
+  if (!silent) loading.value = true
   const hoje = new Date()
-  // Janela de 3 meses passados + 3 meses futuros — cobre o calendário e a detecção de conflitos
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1)
-  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 4, 0)
+  // Janela configurável para permitir carga inicial rápida e hidratação em segundo plano.
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - mesesPassados, 1)
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + mesesFuturos, 0)
   const params = {
     data_inicio: formatDateISOInSaoPaulo(inicio),
     data_fim: formatDateISOInSaoPaulo(fim),
@@ -1961,11 +1966,11 @@ async function fetchAgendamentos() {
   } catch (e) {
     console.error('Erro ao carregar agendamentos:', e)
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
-watch(filtroProfissional, fetchAgendamentos)
+watch(filtroProfissional, () => fetchAgendamentos())
 
 // ─── Clientes CRUD ─────────────────────────────────────────────────────────
 const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
@@ -2144,9 +2149,19 @@ async function fetchReferencias() {
   } catch (e) { console.error('Erro ao carregar referências:', e) }
 }
 
-onMounted(() => {
+onMounted(async () => {
   carregarCoresFavoritas()
-  return Promise.all([fetchAgendamentos(), fetchClientes(), fetchReferencias(), fetchTarefas()])
+
+  // 1) Resposta rápida: janela menor para renderizar calendário mais cedo.
+  await fetchAgendamentos({ mesesPassados: 1, mesesFuturos: 2 })
+
+  // 2) Hidratação em segundo plano: dados completos e auxiliares sem travar a primeira pintura.
+  setTimeout(() => {
+    fetchAgendamentos({ silent: true, mesesPassados: 3, mesesFuturos: 4 })
+    fetchClientes()
+    fetchReferencias()
+    fetchTarefas()
+  }, 0)
 })
 </script>
 
