@@ -11,7 +11,7 @@ class ClienteCreate(BaseModel):
     telefone: str | None = None
     email: EmailStr | None = None
     observacoes: str | None = None
-    campos_dinamicos: dict[str, Any] | None = None
+    campos_dinamicos: dict[str, Any] | list | None = None
 
 
 class ClienteUpdate(BaseModel):
@@ -19,7 +19,7 @@ class ClienteUpdate(BaseModel):
     telefone: str | None = None
     email: EmailStr | None = None
     observacoes: str | None = None
-    campos_dinamicos: dict[str, Any] | None = None
+    campos_dinamicos: dict[str, Any] | list | None = None
 
 
 class ClienteResponse(BaseModel):
@@ -30,5 +30,5 @@ class ClienteResponse(BaseModel):
     telefone: str | None
     email: str | None
     observacoes: str | None = None
-    campos_dinamicos: dict[str, Any] | None = None
+    campos_dinamicos: dict[str, Any] | list | None = None
     criado_em: UTCDatetime
