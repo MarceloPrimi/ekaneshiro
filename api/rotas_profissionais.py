@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from api.dependencias import get_current_admin, get_current_user
 from db.database import get_db
@@ -17,6 +17,14 @@ from schemas.profissionais import (
 from schemas.secoes import SecaoResponse, SecaosProfissionalUpdate
 
 router = APIRouter(prefix="/profissionais", tags=["Profissionais"])
+
+# Eager loading: evita N+1 ao montar a resposta com serviços + seções.
+# Sem isso, cada profissional dispara 1 query por serviço e por seção,
+# o que com latência alta ao banco (produção) deixa a listagem lenta.
+_EAGER_PROFISSIONAL = [
+    selectinload(Profissional.servicos).joinedload(ProfissionalServico.servico),
+    selectinload(Profissional.secoes).joinedload(ProfissionalSecao.secao),
+]
 
 
 @router.post(
@@ -56,7 +64,7 @@ def listar_profissionais(
     _: Annotated[Usuario, Depends(get_current_user)],
     apenas_ativos: bool = True,
 ):
-    query = db.query(Profissional)
+    query = db.query(Profissional).options(*_EAGER_PROFISSIONAL)
     if apenas_ativos:
         query = query.filter(Profissional.ativo == True)
     profissionais = query.order_by(Profissional.nome).all()
@@ -73,7 +81,12 @@ def buscar_profissional(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[Usuario, Depends(get_current_user)],
 ):
-    profissional = db.query(Profissional).filter(Profissional.id == profissional_id).first()
+    profissional = (
+        db.query(Profissional)
+        .options(*_EAGER_PROFISSIONAL)
+        .filter(Profissional.id == profissional_id)
+        .first()
+    )
     if not profissional:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Profissional não encontrado."

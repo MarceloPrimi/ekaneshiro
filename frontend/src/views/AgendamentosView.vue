@@ -2480,9 +2480,13 @@ onMounted(async () => {
   // 1) Resposta rápida: janela menor para renderizar calendário mais cedo.
   await fetchAgendamentos({ mesesPassados: 12, mesesFuturos: 2 })
 
-  // 2) Hidratação em segundo plano: estende histórico completo sem travar a primeira pintura.
+  // 2) Hidratação em segundo plano sem travar a primeira pintura.
+  //    Janela reduzida (18 meses) em vez de "tudo": serializar os ~5000
+  //    agendamentos aninhados sobrecarrega a CPU pequena do plano free.
+  //    Navegar para períodos mais antigos no calendário dispara onDatesSet,
+  //    que busca o intervalo sob demanda — então não perdemos histórico.
   setTimeout(() => {
-    fetchAgendamentos({ silent: true, merge: true, mesesPassados: 60, mesesFuturos: 4 })
+    fetchAgendamentos({ silent: true, merge: true, mesesPassados: 18, mesesFuturos: 4 })
     fetchClientes()
     fetchReferencias()
     fetchTarefas()

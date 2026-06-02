@@ -49,8 +49,30 @@ def criar_cliente(
 def listar_clientes(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[Usuario, Depends(get_current_user)],
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ):
-    return db.query(Cliente).order_by(Cliente.nome).all()
+    """
+    Lista clientes ordenados por nome.
+
+    - `q`: busca server-side por nome ou telefone (case-insensitive). Evita
+      trafegar/renderizar os milhares de clientes só para filtrar no navegador.
+    - `limit`/`offset`: paginação opcional. Sem parâmetros, mantém o comportamento
+      antigo (retorna todos) para não quebrar telas que ainda dependem disso.
+    """
+    query = db.query(Cliente)
+    if q:
+        termo = f"%{q.strip()}%"
+        query = query.filter(
+            (Cliente.nome.ilike(termo)) | (Cliente.telefone.ilike(termo))
+        )
+    query = query.order_by(Cliente.nome)
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
 @router.get("/{cliente_id}", response_model=ClienteResponse, summary="Buscar cliente por ID")

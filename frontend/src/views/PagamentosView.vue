@@ -315,18 +315,28 @@ const listaFiltrada = computed(() => {
 
 async function fetchAgendamentos() {
   loading.value = true
-  const hoje = new Date()
-  // Janela de 6 meses passados + 1 mês futuro (cobre inadimplentes recentes)
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 6, 1)
-  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0)
-  const params = {
-    data_inicio: inicio.toISOString().slice(0, 10),
-    data_fim: fim.toISOString().slice(0, 10),
+  // Busca apenas o intervalo do filtro (por padrão, só "hoje"), em vez de baixar
+  // 6+ meses de agendamentos e filtrar tudo no navegador. Isso reduz drasticamente
+  // o payload e a serialização no servidor — principal causa da lentidão da tela.
+  const params = {}
+  if (filtroDe.value) params.data_inicio = filtroDe.value
+  if (filtroAte.value) params.data_fim = filtroAte.value
+  try {
+    const { data } = await api.get('/agendamentos/', { params })
+    agendamentos.value = data
+  } finally {
+    loading.value = false
   }
-  const { data } = await api.get('/agendamentos/', { params })
-  agendamentos.value = data
-  loading.value = false
 }
+
+// Refaz a busca no servidor sempre que o intervalo de datas mudar.
+// (status e "pendentes de pagamento" continuam sendo filtrados em memória, pois
+// já estão dentro do intervalo carregado e o custo é desprezível.)
+let _debounceFetch
+watch([filtroDe, filtroAte], () => {
+  clearTimeout(_debounceFetch)
+  _debounceFetch = setTimeout(fetchAgendamentos, 250)
+})
 
 function alterarStatus(id, novoStatus) {
   api.patch(`/agendamentos/${id}/status`, { status: novoStatus }).then(fetchAgendamentos)

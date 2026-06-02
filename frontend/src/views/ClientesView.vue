@@ -47,6 +47,10 @@
       </table>
     </div>
 
+    <p v-if="!loading && !busca.trim() && clientes.length >= LIMITE_CLIENTES" class="text-xs text-gray-400 mt-2 px-1">
+      Mostrando os primeiros {{ LIMITE_CLIENTES }} clientes. Use a busca para encontrar os demais.
+    </p>
+
     <!-- Drawer (modal largo) -->
     <div v-if="drawer" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4" @click.self="fechar">
       <div class="bg-white w-full sm:max-w-3xl sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
@@ -207,7 +211,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 
@@ -229,14 +233,9 @@ const loadingHistorico = ref(false)
 
 // ─── Computed ──────────────────────────────────────────────────────────────
 
-const clientesFiltrados = computed(() => {
-  const q = busca.value.trim().toLowerCase()
-  if (!q) return clientes.value
-  return clientes.value.filter(c =>
-    c.nome.toLowerCase().includes(q) ||
-    (c.telefone && c.telefone.includes(q))
-  )
-})
+// A filtragem é feita no servidor (busca server-side). Aqui só repassamos a lista
+// já filtrada/limitada que veio da API.
+const clientesFiltrados = computed(() => clientes.value)
 
 // achata os itens de todos os agendamentos, mais recente primeiro
 const historicoItens = computed(() => {
@@ -282,12 +281,29 @@ function statusDot(status) {
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
+// Quando não há busca, carrega só os primeiros N (alfabético) em vez dos milhares
+// de clientes — reduz payload e o número de linhas renderizadas. A busca digitada
+// consulta o servidor, então qualquer cliente continua acessível.
+const LIMITE_CLIENTES = 100
+
 async function fetchClientes() {
   loading.value = true
-  const { data } = await api.get('/clientes/')
-  clientes.value = data
-  loading.value = false
+  try {
+    const q = busca.value.trim()
+    const params = { limit: LIMITE_CLIENTES }
+    if (q) params.q = q
+    const { data } = await api.get('/clientes/', { params })
+    clientes.value = data
+  } finally {
+    loading.value = false
+  }
 }
+
+let _debounceBusca
+watch(busca, () => {
+  clearTimeout(_debounceBusca)
+  _debounceBusca = setTimeout(fetchClientes, 300)
+})
 
 async function fetchHistorico(clienteId) {
   loadingHistorico.value = true

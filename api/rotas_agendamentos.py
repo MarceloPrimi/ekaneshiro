@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -81,19 +81,26 @@ def listar_agendamentos(
     if status_filtro:
         query = query.filter(Agendamento.status == status_filtro)
 
-    # Filtro de intervalo de datas via EXISTS — não cria join que duplica linhas
+    # Filtro de intervalo de datas via EXISTS — não cria join que duplica linhas.
+    # data_inicio/data_fim chegam como `date`; convertemos para limites de dia
+    # para que o filtro seja inclusivo no dia inteiro (00:00 do início até o
+    # último instante do dia final). Sem isso, "data_fim = hoje" excluiria todos
+    # os agendamentos de hoje (pois date vira 00:00 e nenhum horário fica <= 00:00).
     if data_inicio:
+        inicio_dt = datetime.combine(data_inicio, time.min)
         query = query.filter(
             exists().where(
                 (ItemAgendamento.agendamento_id == Agendamento.id)
-                & (ItemAgendamento.data_hora_inicio >= data_inicio)
+                & (ItemAgendamento.data_hora_inicio >= inicio_dt)
             )
         )
     if data_fim:
+        # Limite superior exclusivo no dia seguinte → cobre todo o dia data_fim.
+        fim_dt = datetime.combine(data_fim, time.min) + timedelta(days=1)
         query = query.filter(
             exists().where(
                 (ItemAgendamento.agendamento_id == Agendamento.id)
-                & (ItemAgendamento.data_hora_inicio <= data_fim)
+                & (ItemAgendamento.data_hora_inicio < fim_dt)
             )
         )
 
