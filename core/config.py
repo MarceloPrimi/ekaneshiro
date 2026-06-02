@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     # Segurança JWT
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # 12h: evita que o usuário seja deslogado no meio do expediente. Um 401 por
+    # expiração dispara logout() no frontend, que limpa o token e faz as demais
+    # requisições em paralelo falharem com "Not authenticated".
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
 
     # Google OAuth 2.0
     GOOGLE_CLIENT_ID: str = ""
