@@ -2477,19 +2477,30 @@ async function fetchReferencias() {
 onMounted(async () => {
   carregarCoresFavoritas()
 
-  // 1) Resposta rápida: janela menor para renderizar calendário mais cedo.
-  await fetchAgendamentos({ mesesPassados: 12, mesesFuturos: 2 })
+  // ── Estágio 1: SEMANA ATUAL primeiro ───────────────────────────────────────
+  // A recepcionista abre sempre na visão semanal. Buscamos só ~2 semanas
+  // (hoje ±10 dias) para um payload mínimo e pintar o calendário quase imediato.
+  const hoje = new Date()
+  const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
+  const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
+  await fetchAgendamentos({ fromDate: semanaInicio, toDate: semanaFim })
 
-  // 2) Hidratação em segundo plano sem travar a primeira pintura.
-  //    Janela reduzida (18 meses) em vez de "tudo": serializar os ~5000
-  //    agendamentos aninhados sobrecarrega a CPU pequena do plano free.
-  //    Navegar para períodos mais antigos no calendário dispara onDatesSet,
-  //    que busca o intervalo sob demanda — então não perdemos histórico.
-  setTimeout(() => {
-    fetchAgendamentos({ silent: true, merge: true, mesesPassados: 18, mesesFuturos: 4 })
-    fetchClientes()
+  // ── Estágios seguintes: hidratação progressiva em segundo plano ─────────────
+  // Cada etapa amplia o intervalo já carregado (merge), em sequência para não
+  // sobrecarregar a CPU pequena do plano free. Navegar para fora do intervalo
+  // já dispara onDatesSet (busca sob demanda), então nada de histórico se perde.
+  setTimeout(async () => {
+    // Referências e listas auxiliares (payloads pequenos) — necessárias para
+    // montar/editar agendamentos e o dropdown de clientes.
     fetchReferencias()
     fetchTarefas()
+    fetchClientes()
+
+    // Amplia a janela de agendamentos em degraus: vizinhança imediata primeiro
+    // (navegação prev/next instantânea), depois o histórico mais amplo.
+    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 1, mesesFuturos: 1 })
+    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 3, mesesFuturos: 2 })
+    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 12, mesesFuturos: 4 })
   }, 0)
 })
 </script>
