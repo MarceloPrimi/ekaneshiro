@@ -143,7 +143,7 @@ def editar_agendamento(
     current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
-    return agendamento_service.atualizar_agendamento(db, agendamento, payload)
+    return agendamento_service.atualizar_agendamento(db, agendamento, payload, criado_por_id=current_user.id)
 
 
 @router.patch(

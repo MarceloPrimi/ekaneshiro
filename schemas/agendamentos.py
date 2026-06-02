@@ -1,14 +1,55 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from schemas import UTCDatetime
 
 from db.models import StatusAgendamentoEnum
+from schemas.categorias_agendamento import CategoriaAgendamentoResponse
 from schemas.clientes import ClienteResponse
 from schemas.profissionais import ProfissionalResponse
 from schemas.servicos import ServicoResponse
+
+
+# ---------------------------------------------------------------------------
+# Mini Etiquetas — catálogo estático de stickers
+# ---------------------------------------------------------------------------
+
+MINI_ETIQUETAS_CATALOG: dict[str, str] = {
+    "urgente":        "🚀",
+    "pago":           "💰",
+    "falta_doc":      "⚠️",
+    "confirmado":     "✅",
+    "retorno":        "🔄",
+    "vip":            "⭐",
+    "primeira_vez":   "✨",
+}
+
+MiniEtiquetaCodigo = Literal[
+    "urgente", "pago", "falta_doc", "confirmado", "retorno", "vip", "primeira_vez"
+]
+
+# ---------------------------------------------------------------------------
+# Recorrência
+# ---------------------------------------------------------------------------
+
+class RecurrenceRule(BaseModel):
+    """Subconjunto simplificado de RRULE usado no formulário."""
+    freq: Literal["weekly", "biweekly", "monthly"]
+    count: int | None = Field(default=None, ge=1, le=104)
+
+    def to_rrule(self) -> str:
+        mapping = {
+            "weekly":   "FREQ=WEEKLY;INTERVAL=1",
+            "biweekly": "FREQ=WEEKLY;INTERVAL=2",
+            "monthly":  "FREQ=MONTHLY;INTERVAL=1",
+        }
+        base = mapping[self.freq]
+        if self.count is not None:
+            base += f";COUNT={self.count}"
+        return base
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +70,10 @@ class AgendamentoCreate(BaseModel):
     itens: list[ItemAgendamentoCreate]
     cor_hex: str | None = None
     observacoes: str | None = None
+    # Novos campos
+    categoria_id: int | None = None
+    recurrence: RecurrenceRule | None = None
+    mini_etiquetas: list[MiniEtiquetaCodigo] | None = None
 
 
 class AgendamentoStatusUpdate(BaseModel):
@@ -40,6 +85,12 @@ class AgendamentoUpdate(BaseModel):
     itens: list[ItemAgendamentoCreate]
     cor_hex: str | None = None
     observacoes: str | None = None
+    # Novos campos
+    categoria_id: int | None = None
+    recurrence: RecurrenceRule | None = None
+    mini_etiquetas: list[MiniEtiquetaCodigo] | None = None
+    # "this" = só este; "all" = toda a série
+    edit_scope: Literal["this", "all"] = "this"
 
 
 class AgendamentoCorUpdate(BaseModel):
@@ -70,6 +121,7 @@ class ItemAgendamentoResponse(BaseModel):
 class PagamentoCreate(BaseModel):
     valor: Decimal
     metodo: str   # "pix" | "cartao_credito" | "dinheiro" | etc.
+    credito_utilizado: Decimal = Decimal("0.00")
 
 
 class PagamentoResponse(BaseModel):
@@ -79,6 +131,7 @@ class PagamentoResponse(BaseModel):
     agendamento_id: int
     valor: Decimal
     metodo: str
+    credito_utilizado: Decimal
     pago_em: UTCDatetime
 
 
@@ -94,3 +147,11 @@ class AgendamentoResponse(BaseModel):
     criado_em: UTCDatetime
     itens: list[ItemAgendamentoResponse]
     pagamento: PagamentoResponse | None = None
+    # Novos campos
+    categoria_id: int | None = None
+    categoria: CategoriaAgendamentoResponse | None = None
+    recurrence_rule: str | None = None
+    parent_id: int | None = None
+    mini_etiquetas: list[str] | None = None
+    primeira_vez: bool = False
+

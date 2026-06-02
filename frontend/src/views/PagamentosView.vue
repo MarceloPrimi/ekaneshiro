@@ -100,10 +100,15 @@
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-semibold text-green-700">R$ {{ Number(ag.pagamento.valor).toFixed(2) }}</span>
                   <span
-                    v-if="Number(ag.pagamento.valor) < Number(totalAgendamento(ag))"
+                    v-if="Number(ag.pagamento.valor) < Number(totalAgendamento(ag)) && !ag.pagamento.credito_utilizado"
                     class="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-medium"
                     :title="'Total original: R$ ' + totalAgendamento(ag)"
                   >-R$ {{ (Number(totalAgendamento(ag)) - Number(ag.pagamento.valor)).toFixed(2) }}</span>
+                  <span
+                    v-if="ag.pagamento.credito_utilizado && Number(ag.pagamento.credito_utilizado) > 0"
+                    class="text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded font-medium"
+                    :title="'Crédito utilizado'"
+                  >Crédito: R$ {{ Number(ag.pagamento.credito_utilizado).toFixed(2) }}</span>
                 </div>
                 <div class="text-gray-400">{{ metodoPagLabel(ag.pagamento.metodo) }}</div>
                 <div class="text-gray-400">{{ formatDate(ag.pagamento.pago_em) }}</div>
@@ -161,6 +166,21 @@
         </div>
 
         <form @submit.prevent="confirmarPagamento" class="space-y-4">
+          <div v-if="Number(agSelecionado?.cliente?.saldo_credito) > 0" class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-semibold text-indigo-800">Usar Crédito (Saldo: R$ {{ Number(agSelecionado?.cliente?.saldo_credito).toFixed(2) }})</label>
+            </div>
+            <input
+              v-model="formPag.credito_utilizado"
+              type="number"
+              step="0.01"
+              min="0"
+              :max="agSelecionado?.cliente?.saldo_credito"
+              class="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              placeholder="0.00"
+            />
+          </div>
+
           <div class="flex gap-3">
             <div class="flex-1">
               <label class="block text-sm font-medium text-gray-700 mb-1">Desconto (R$)</label>
@@ -182,7 +202,7 @@
                 min="0.01"
                 required
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                :class="{ 'border-amber-400 bg-amber-50': Number(formPag.desconto) > 0 }"
+                :class="{ 'border-amber-400 bg-amber-50': Number(formPag.desconto) > 0 || Number(formPag.credito_utilizado) > 0 }"
               />
             </div>
           </div>
@@ -199,6 +219,10 @@
               <option value="cartao_credito">Cartão de Crédito</option>
               <option value="cartao_debito">Cartão de Débito</option>
             </select>
+          </div>
+
+          <div v-if="formPag.metodo === 'dinheiro' && creditoGerado > 0" class="bg-green-50 text-green-800 p-2 rounded text-xs font-semibold mt-2">
+            R$ {{ creditoGerado.toFixed(2) }} será adicionado como crédito ao cliente.
           </div>
 
           <!-- Alterar status junto com o pagamento -->
@@ -257,7 +281,7 @@ const modalAberto = ref(false)
 const agSelecionado = ref(null)
 const saving = ref(false)
 const erro = ref('')
-const formPag = ref({ valor: '', desconto: '0.00', metodo: '', novoStatus: '' })
+const formPag = ref({ valor: '', desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' })
 const mostrarTotal = ref(false)
 const baseValorModal = ref('0.00') // base antes do desconto (total ou preço de serviço selecionado)
 
@@ -313,22 +337,29 @@ function setValorBase(preco) {
   baseValorModal.value = v
   formPag.value.valor = v
   formPag.value.desconto = '0.00'
+  formPag.value.credito_utilizado = '0.00'
 }
 
 function abrirModal(ag) {
   agSelecionado.value = ag
   const total = totalAgendamento(ag)
   baseValorModal.value = total
-  formPag.value = { valor: total, desconto: '0.00', metodo: '', novoStatus: '' }
+  formPag.value = { valor: total, desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' }
   erro.value = ''
   modalAberto.value = true
 }
 
 // Desconto reduz sempre a partir do valor base selecionado (total ou serviço isolado)
-watch(() => formPag.value.desconto, (desc) => {
+watch([() => formPag.value.desconto, () => formPag.value.credito_utilizado], ([desc, cred]) => {
   if (!agSelecionado.value) return
-  const newValor = Math.max(0, Number(baseValorModal.value) - Number(desc)).toFixed(2)
+  const newValor = Math.max(0, Number(baseValorModal.value) - Number(desc || 0) - Number(cred || 0)).toFixed(2)
   if (Number(newValor) !== Number(formPag.value.valor)) formPag.value.valor = newValor
+})
+
+const creditoGerado = computed(() => {
+  if (formPag.value.metodo !== 'dinheiro') return 0
+  const valorDevido = Math.max(0, Number(baseValorModal.value) - Number(formPag.value.desconto || 0) - Number(formPag.value.credito_utilizado || 0))
+  return Math.max(0, Number(formPag.value.valor) - valorDevido)
 })
 
 async function confirmarPagamento() {
@@ -344,6 +375,7 @@ async function confirmarPagamento() {
     await api.post(`/agendamentos/${agSelecionado.value.id}/pagamento`, {
       valor: formPag.value.valor,
       metodo: formPag.value.metodo,
+      credito_utilizado: formPag.value.credito_utilizado || 0,
     })
     modalAberto.value = false
     toastSucesso('Pagamento registrado com sucesso!')

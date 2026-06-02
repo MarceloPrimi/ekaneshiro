@@ -5,9 +5,25 @@ from sqlalchemy import (
     Boolean, Column, DateTime, Enum, ForeignKey,
     Integer, JSON, Numeric, String, Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from db.database import Base
+
+
+# ---------------------------------------------------------------------------
+# Categorias de Agendamento (cor + título personalizável)
+# ---------------------------------------------------------------------------
+
+class CategoriaAgendamento(Base):
+    __tablename__ = "categorias_agendamento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False, unique=True)
+    cor_hex = Column(String(7), nullable=False, default="#6366f1")
+    ativo = Column(Boolean, default=True, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    agendamentos = relationship("Agendamento", back_populates="categoria")
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +76,7 @@ class Cliente(Base):
     observacoes = Column(Text, nullable=True)
     # JSON: lista de {chave, valor} para campos customizados
     campos_dinamicos = Column(JSON, nullable=True)
+    saldo_credito = Column(Numeric(10, 2), nullable=False, default=0.00)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     agendamentos = relationship("Agendamento", back_populates="cliente")
@@ -173,10 +190,34 @@ class Agendamento(Base):
     )
     cor_hex = Column(String(7), nullable=True)
     observacoes = Column(Text, nullable=True)
+    id_legado = Column(String(100), nullable=True, unique=True, index=True)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
 
+    # ── Funcionalidades avançadas ──────────────────────────────────────
+    # Categoria de cor/tipo (ex: "Retorno", "Avaliação", "Urgente")
+    categoria_id = Column(
+        Integer, ForeignKey("categorias_agendamento.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    # Regra de recorrência no formato RRULE (ex: "FREQ=WEEKLY;INTERVAL=1")
+    recurrence_rule = Column(String(500), nullable=True)
+    # Agendamento-pai da série (preenchido nas ocorrências filhas)
+    parent_id = Column(
+        Integer, ForeignKey("agendamentos.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    # JSON: lista de códigos de mini-etiquetas (ex: ["urgente", "pago", "primeira_vez"])
+    mini_etiquetas = Column(JSON, nullable=True)
+    # Se este é o primeiro atendimento do cliente (calculado no momento da criação)
+    primeira_vez = Column(Boolean, nullable=False, default=False)
+
     cliente = relationship("Cliente", back_populates="agendamentos")
+    categoria = relationship("CategoriaAgendamento", back_populates="agendamentos")
+    filhos = relationship(
+        "Agendamento", foreign_keys="Agendamento.parent_id",
+        backref=backref("pai", remote_side="Agendamento.id"), lazy="dynamic",
+    )
     itens = relationship(
         "ItemAgendamento", back_populates="agendamento", cascade="all, delete-orphan"
     )
@@ -216,6 +257,7 @@ class Pagamento(Base):
     agendamento_id = Column(Integer, ForeignKey("agendamentos.id"), nullable=False, unique=True)
     valor = Column(Numeric(10, 2), nullable=False)
     metodo = Column(String(50), nullable=False)   # ex: "pix", "cartao_credito", "dinheiro"
+    credito_utilizado = Column(Numeric(10, 2), nullable=False, default=0.00)
     pago_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     registrado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
 

@@ -252,7 +252,7 @@
           <!-- Hora axis -->
           <div class="w-14 flex-shrink-0">
             <div class="h-10 border-b border-gray-100"></div>
-            <div v-for="h in colunaSlots" :key="h" class="h-14 border-b border-gray-100 flex items-start px-2 pt-1">
+            <div v-for="h in colunaSlots" :key="h" class="h-9 border-b border-gray-100 flex items-start px-2 pt-1">
               <span class="text-xs text-gray-400">{{ h }}</span>
             </div>
           </div>
@@ -269,7 +269,7 @@
               <div
                 v-for="h in colunaSlots"
                 :key="h"
-                class="h-14 border-b border-gray-100 cursor-pointer hover:bg-rose-50/50 transition-colors"
+                class="h-9 border-b border-gray-100 cursor-pointer hover:bg-rose-50/50 transition-colors"
                 @click="colunaSlotClick(prof.id, h)"
               ></div>
               <!-- Events -->
@@ -278,7 +278,7 @@
                 :key="ev.id"
                 class="absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-xs cursor-pointer overflow-hidden"
                 :style="colunaEventoStyle(ev)"
-                :title="`Status: ${STATUS_LABELS[ev.ag?.status] || ev.ag?.status || 'Sem status'}`"
+                :title="`Cliente: ${ev.clienteNome}\nStatus: ${STATUS_LABELS[ev.ag?.status] || ev.ag?.status || 'Sem status'}\nProfissional: ${ev.extendedProps?.profNome || prof.nome}`"
                 @click="detalheAg = ev.ag"
               >
                 <div class="font-semibold truncate" :style="{ color: ev.color.text }">{{ ev.clienteNome }}</div>
@@ -295,7 +295,7 @@
               <div
                 v-for="h in colunaSlots"
                 :key="h"
-                class="h-14 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                class="h-9 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors"
                 @click="abrirModalTarefa(colunaDia + 'T' + h)"
               ></div>
               <div
@@ -420,6 +420,41 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea v-model="formData.observacoes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"></textarea>
           </div>
+
+          <!-- Recorrência -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Repetição</label>
+            <select v-model="formData.recurrence" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400">
+              <option :value="null">Não repetir</option>
+              <option value="weekly">Semanal</option>
+              <option value="biweekly">Quinzenal</option>
+              <option value="monthly">Mensal</option>
+            </select>
+            <!-- Quantidade de repetições -->
+            <div v-if="formData.recurrence" class="mt-2 flex items-center gap-2">
+              <span class="text-sm text-gray-600 whitespace-nowrap">Repetir por</span>
+              <input
+                type="number" v-model.number="formData.recurrence_count"
+                min="1" max="104"
+                :placeholder="formData.recurrence === 'monthly' ? '6' : '12'"
+                class="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+              <span class="text-sm text-gray-600">{{ formData.recurrence === 'monthly' ? 'meses' : 'semanas' }}</span>
+            </div>
+          </div>
+
+          <!-- Escopo de edição (apenas ao editar série recorrente) -->
+          <div v-if="modalMode === 'edit' && formData.recurrence" class="flex gap-3">
+            <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+              <input type="radio" v-model="formData.edit_scope" value="this" class="accent-rose-500" />
+              Apenas este
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+              <input type="radio" v-model="formData.edit_scope" value="all" class="accent-rose-500" />
+              Todos da série
+            </label>
+          </div>
+
           <p v-if="modalError" class="text-sm text-red-500">{{ modalError }}</p>
           <div class="flex gap-2 pt-2">
             <button type="button" class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-3 text-sm hover:bg-gray-50" @click="showModal = false">Cancelar</button>
@@ -576,6 +611,9 @@
               <p class="text-sm font-bold text-gray-800">{{ detalheAg.cliente?.nome }}</p>
               <p v-if="detalheAg.cliente?.telefone" class="text-xs text-gray-500 mt-1">{{ detalheAg.cliente.telefone }}</p>
               <p v-if="detalheAg.cliente?.observacoes" class="text-xs text-gray-400 mt-1.5 italic">{{ detalheAg.cliente.observacoes }}</p>
+              <p v-if="Number(detalheAg.cliente?.saldo_credito) > 0" class="text-xs font-semibold text-green-700 mt-1">
+                Saldo de crédito: R$ {{ Number(detalheAg.cliente.saldo_credito).toFixed(2) }}
+              </p>
               <button
                 class="mt-3 text-xs text-rose-600 font-semibold hover:underline"
                 @click="abrirDrawerCliente(detalheAg.cliente); detalheAg = null"
@@ -596,7 +634,28 @@
               <div class="flex items-start gap-2">
                 <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-yellow-400': item.agStatus==='pendente', 'bg-blue-400': item.agStatus==='confirmado', 'bg-green-400': item.agStatus==='concluido', 'bg-red-400': item.agStatus==='cancelado' }"></span>
                 <div class="min-w-0">
-                  <p class="text-xs font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
+                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
+                  <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Próximos Agendamentos -->
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-3">
+              Próximos Agendamentos
+              <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteProximosItens.length }})</span>
+            </h4>
+            <div v-if="loadingDetalheClienteHistorico" class="text-xs text-gray-400 py-2">Carregando...</div>
+            <div v-else-if="detalheClienteProximosItens.length === 0" class="text-xs text-gray-400 italic">Nenhum próximo agendamento.</div>
+            <div
+              v-for="(item, idx) in detalheClienteProximosItens.slice(0, 8)"
+              :key="'prox-' + idx"
+              class="mb-2 bg-indigo-50/60 rounded-xl px-3 py-2.5 border border-indigo-100"
+            >
+              <div class="flex items-start gap-2">
+                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-yellow-400': item.agStatus==='pendente', 'bg-blue-400': item.agStatus==='confirmado', 'bg-green-400': item.agStatus==='concluido' }"></span>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
                   <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
                 </div>
               </div>
@@ -651,6 +710,21 @@
             </div>
           </div>
 
+          <div v-if="Number(agPagSelecionado?.cliente?.saldo_credito) > 0" class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-semibold text-indigo-800">Usar Crédito (Saldo: R$ {{ Number(agPagSelecionado?.cliente?.saldo_credito).toFixed(2) }})</label>
+            </div>
+            <input
+              v-model="formPagAg.credito_utilizado"
+              type="number"
+              step="0.01"
+              min="0"
+              :max="agPagSelecionado?.cliente?.saldo_credito"
+              class="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              placeholder="0.00"
+            />
+          </div>
+
           <form id="form-pag-ag" @submit.prevent="confirmarPagamentoAg" class="space-y-4">
             <div class="flex gap-3">
               <div class="flex-1">
@@ -663,7 +737,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Valor (R$) *</label>
                 <input v-model="formPagAg.valor" type="number" step="0.01" min="0.01" required
                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                  :class="{ 'border-amber-400 bg-amber-50': Number(formPagAg.desconto) > 0 }" />
+                  :class="{ 'border-amber-400 bg-amber-50': Number(formPagAg.desconto) > 0 || Number(formPagAg.credito_utilizado) > 0 }" />
               </div>
             </div>
             <div>
@@ -676,6 +750,9 @@
                 <option value="cartao_credito">Cartão de Crédito</option>
                 <option value="cartao_debito">Cartão de Débito</option>
               </select>
+            </div>
+            <div v-if="formPagAg.metodo === 'dinheiro' && creditoGeradoAg > 0" class="bg-green-50 text-green-800 p-2 rounded text-xs font-semibold mt-2">
+              R$ {{ creditoGeradoAg.toFixed(2) }} será adicionado como crédito ao cliente.
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Status do agendamento</label>
@@ -819,6 +896,9 @@
                   -->
                   <input v-model="formCliente.telefone" type="tel" inputmode="tel" class="flex-1 px-3 py-2 text-sm focus:outline-none h-full" placeholder="(11) 99999-9999" />
                 </div>
+                <p v-if="Number(formCliente.saldo_credito) > 0" class="text-xs font-semibold text-green-700 mt-1">
+                  Saldo de crédito: R$ {{ Number(formCliente.saldo_credito).toFixed(2) }}
+                </p>
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notas do cliente</label>
@@ -856,7 +936,7 @@
             <h4 class="text-sm font-semibold text-gray-700 mb-4">Visitas anteriores</h4>
             <div v-if="!clienteSelecionadoPainel?.id" class="text-sm text-gray-400 italic">Salve o cliente para ver o histórico.</div>
             <div v-else-if="loadingHistoricoCliente" class="text-sm text-gray-400">Carregando...</div>
-            <div v-else-if="historicoClienteItens.length === 0" class="text-sm text-gray-400 italic">Nenhuma visita registrada.</div>
+            <div v-else-if="historicoClienteItens.length === 0" class="text-sm text-gray-400 italic">Nenhuma visita.</div>
             <div v-for="(item, idx) in historicoClienteItens" :key="idx" class="mb-3 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-2.5 min-w-0">
@@ -966,6 +1046,17 @@
       </div>
     </div>
 
+    <!-- CalendarClickModal: escolha Agendamento ou Tarefa ao clicar na célula -->
+    <CalendarClickModal
+      :show="decisionModal.show"
+      :dataHora="decisionModal.dataHora"
+      :posX="decisionModal.posX"
+      :posY="decisionModal.posY"
+      @close="decisionModal.show = false"
+      @select:agendamento="(dt) => { decisionModal.show = false; abrirModalNovo(dt) }"
+      @select:tarefa="(dt) => { decisionModal.show = false; abrirModalTarefa(dt) }"
+    />
+
   </div>
 </template>
 
@@ -981,6 +1072,7 @@ import listPlugin from '@fullcalendar/list'
 import ptBrLocale from '@fullcalendar/core/locales/pt-br'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
+import CalendarClickModal from '@/components/CalendarClickModal.vue'
 
 const { sucesso: toastSucesso } = useToast()
 
@@ -994,6 +1086,9 @@ const clientes = ref([])
 const servicos = ref([])
 const profissionais = ref([])
 const loading = ref(true)
+const loadedFrom = ref(null)   // Date — início do intervalo já carregado
+const loadedTo = ref(null)     // Date — fim do intervalo já carregado
+const fetchingRange = ref(false)
 const loadingClientes = ref(false)
 
 const filtroProfissional = ref(null)
@@ -1075,8 +1170,12 @@ const agPagSelecionado = ref(null)
 const savingPagAg = ref(false)
 const erroPagAg = ref('')
 const basePagAg = ref('0.00')
-const formPagAg = ref({ valor: '', desconto: '0.00', metodo: '', novoStatus: '' })
-const formData = ref({ id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [] })
+const formPagAg = ref({ valor: '', desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' })
+const formData = ref({ id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [],
+  recurrence: null, recurrence_count: null, edit_scope: 'this' })
+
+// Decision modal — abre ao clicar na célula do calendário
+const decisionModal = ref({ show: false, dataHora: null, posX: 0, posY: 0 })
 
 // Modal rápido de cliente dentro do agendamento
 const showModalClienteRapido = ref(false)
@@ -1119,11 +1218,31 @@ watch(isMobile, (mobile) => {
 const detalheClienteHistorico = ref([])
 const loadingDetalheClienteHistorico = ref(false)
 const detalheClienteHistoricoItens = computed(() => {
+  const agora = new Date()
   const items = []
   for (const ag of detalheClienteHistorico.value) {
-    for (const item of ag.itens ?? []) items.push({ ...item, agStatus: ag.status })
+    for (const item of ag.itens ?? []) {
+      if (new Date(item.data_hora_inicio) < agora) {
+        items.push({ ...item, agStatus: ag.status, agId: ag.id })
+      }
+    }
   }
   return items.sort((a, b) => new Date(b.data_hora_inicio) - new Date(a.data_hora_inicio))
+})
+
+const detalheClienteProximosItens = computed(() => {
+  const agora = new Date()
+  const agAtual = detalheAg.value?.id
+  const items = []
+  for (const ag of detalheClienteHistorico.value) {
+    if (ag.id === agAtual) continue
+    for (const item of ag.itens ?? []) {
+      if (new Date(item.data_hora_inicio) >= agora && ag.status !== 'cancelado') {
+        items.push({ ...item, agStatus: ag.status, agId: ag.id })
+      }
+    }
+  }
+  return items.sort((a, b) => new Date(a.data_hora_inicio) - new Date(b.data_hora_inicio))
 })
 
 const detalheAgColisoes = computed(() => {
@@ -1345,7 +1464,7 @@ const calendarOptions = computed(() => ({
     ? { left: 'prev,next', center: 'title', right: 'today,timeGridWeek,listWeek' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
   allDaySlot: false,
-  slotMinTime: '07:00:00',
+  slotMinTime: '06:00:00',
   slotMaxTime: computedSlotMax.value,
   slotDuration: '00:30:00',
   slotLabelInterval: '01:00:00',
@@ -1378,6 +1497,7 @@ const calendarOptions = computed(() => ({
   eventDidMount: onEventDidMount,
   dateClick: onDateClick,
   eventContent: renderEventContent,
+  datesSet: onDatesSet,
 }))
 
 // ─── Visão em colunas por profissional ─────────────────────────────────────
@@ -1385,15 +1505,15 @@ const colunaDia = ref(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_
 
 const colunaSlots = computed(() => {
   const slots = []
-  for (let h = 7; h <= 21; h++) {
+  for (let h = 6; h <= 21; h++) {
     slots.push(String(h).padStart(2, '0') + ':00')
     slots.push(String(h).padStart(2, '0') + ':30')
   }
   return slots
 })
 
-const SLOT_HEIGHT = 56 // px — must match h-14 (3.5rem = 56px)
-const DAY_START_MINUTES = 7 * 60  // 07:00
+const SLOT_HEIGHT = 36 // px — must match h-9 (2.25rem = 36px)
+const DAY_START_MINUTES = 6 * 60  // 06:00
 
 function colunaEventosDoProfissional(profId) {
   return calendarEvents.value.filter(ev => {
@@ -1465,6 +1585,15 @@ function renderEventContent(arg) {
     ? (arg.event.end.getTime() - arg.event.start.getTime()) / 60000
     : 60
 
+  const STATUS_FLAG_COLOR = {
+    pendente:   '#f59e0b',
+    confirmado: '#3b82f6',
+    concluido:  '#22c55e',
+    cancelado:  '#ef4444',
+  }
+  const flagColor = STATUS_FLAG_COLOR[ag?.status] ?? '#9ca3af'
+  const flag = `<span class="fc-ev-flag" style="border-top-color:${flagColor}" title="${ag?.status ?? ''}"></span>`
+
   const firstName = (s) => s ? s.split(' ')[0] : ''
   const nomeClienteResumido = (nome) => {
     if (!nome) return ''
@@ -1476,11 +1605,13 @@ function renderEventContent(arg) {
   }
   const clienteDisplayCurto = nomeClienteResumido(clienteNome)
   const te = escapeHtml
+  const tooltipText = te(`Cliente: ${clienteNome}\nStatus: ${ag?.status || 'Sem status'}\nProfissional: ${profNome}`)
 
   // ≤ 30 min (~48px): linha única compacta
   if (durMin <= 30) {
     return {
-      html: `<div class="fc-ev-chip">`
+      html: `<div class="fc-ev-chip" title="${tooltipText}">`
+        + flag
         + `<span class="fc-ev-chip-name">${te(clienteDisplayCurto)}</span>`
         + (hora ? `<span class="fc-ev-chip-sep">·</span><span class="fc-ev-chip-time">${te(hora)}</span>` : '')
         + `</div>`,
@@ -1491,7 +1622,8 @@ function renderEventContent(arg) {
   if (durMin <= 60) {
     const sub = [servNome, firstName(profNome)].filter(Boolean).join(' · ')
     return {
-      html: `<div class="fc-event-inner">`
+      html: `<div class="fc-event-inner" title="${tooltipText}">`
+        + flag
         + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
         + `</div>`,
@@ -1501,7 +1633,8 @@ function renderEventContent(arg) {
   // > 60 min: layout completo — nome + serviço + prof · hora
   const sub2 = [firstName(profNome), hora].filter(Boolean).join(' · ')
   return {
-    html: `<div class="fc-event-inner">`
+    html: `<div class="fc-event-inner" title="${tooltipText}">`
+      + flag
       + `<div class="fc-ev-title">${te(clienteNome)}</div>`
       + (servNome ? `<div class="fc-ev-sub">${te(servNome)}</div>` : '')
       + (sub2 ? `<div class="fc-ev-sub">${te(sub2)}</div>` : '')
@@ -1535,7 +1668,12 @@ function onEventDidMount(info) {
 
 function onDateClick(info) {
   const dt = info.dateStr.includes('T') ? info.dateStr.slice(0, 16) : info.dateStr + 'T09:00'
-  abrirModalNovo(dt)
+  const ev = info.jsEvent
+  if (ev) {
+    decisionModal.value = { show: true, dataHora: dt, posX: ev.clientX, posY: ev.clientY }
+  } else {
+    abrirModalNovo(dt)
+  }
 }
 
 async function onEventDrop(info) {
@@ -1563,11 +1701,25 @@ function emptyItem(dt = '') {
   return { servico_id: '', servico_busca: '', profissional_id: '', data_hora_inicio: dt, data_hora_fim: '' }
 }
 
+function rruleToFreq(rrule) {
+  if (!rrule) return null
+  if (rrule.includes('INTERVAL=2')) return 'biweekly'
+  if (rrule.includes('MONTHLY')) return 'monthly'
+  return 'weekly'
+}
+
+function rruleToCount(rrule) {
+  if (!rrule) return null
+  const m = rrule.match(/COUNT=(\d+)/)
+  return m ? parseInt(m[1]) : null
+}
+
 function abrirModalNovo(dt = '', profId = null) {
   modalMode.value = 'create'
   const item = emptyItem(dt)
   if (profId) item.profissional_id = profId
-  formData.value = { id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [item] }
+  formData.value = { id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [item],
+    recurrence: null, recurrence_count: null, edit_scope: 'this' }
   clienteBuscaNome.value = ''
   modalError.value = ''
   sugestaoItemIdx.value = -1
@@ -1588,6 +1740,9 @@ function abrirModalEditar(ag) {
       data_hora_inicio: toDatetimeLocal(i.data_hora_inicio),
       data_hora_fim: toDatetimeLocal(i.data_hora_fim),
     })),
+    recurrence: rruleToFreq(ag.recurrence_rule),
+    recurrence_count: rruleToCount(ag.recurrence_rule),
+    edit_scope: 'this',
   }
   clienteBuscaNome.value = ag.cliente?.nome || ''
   modalError.value = ''
@@ -1692,10 +1847,8 @@ const conflictosPorItem = computed(() => {
         const eInicio = new Date(ex.data_hora_inicio)
         const eFim = new Date(ex.data_hora_fim)
         if (!(inicio < eFim && fim > eInicio)) continue
-        if ((ex.profissional?.id ?? ex.profissional_id) === profId)
-          return `${ex.profissional?.nome ?? 'Profissional'} já tem "${ex.servico?.nome ?? 'serviço'}" às ${formatHoraCliente(ex.data_hora_inicio)}`
-        if (clienteId && agClienteId === clienteId)
-          return `Atenção: cliente já possui outro serviço nesse horário (${ex.servico?.nome ?? 'serviço'} às ${formatHoraCliente(ex.data_hora_inicio)}).`
+        if ((ex.profissional?.id ?? ex.profissional_id) === profId) { return `${ex.profissional?.nome ?? 'Profissional'} já tem "${ex.servico?.nome ?? 'serviço'}" às ${formatHoraCliente(ex.data_hora_inicio)}` }
+        if (agClienteId === clienteId) { return `Atenção: cliente já possui outro serviço nesse horário (${ex.servico?.nome ?? 'serviço'} às ${formatHoraCliente(ex.data_hora_inicio)}).` }
       }
     }
 
@@ -1706,10 +1859,7 @@ const conflictosPorItem = computed(() => {
       if (!other.data_hora_inicio || !other.data_hora_fim) continue
       const oInicio = new Date(other.data_hora_inicio)
       const oFim = new Date(other.data_hora_fim)
-      if (inicio < oFim && fim > oInicio) {
-        const otherServ = servicos.value.find(s => s.id === other.servico_id)
-        return `Atenção: sobreposição com Serviço ${i + 1} (${otherServ?.nome ?? '—'}).`
-      }
+      if (inicio < oFim && fim > oInicio) { return `Atenção: sobreposição com Serviço ${i + 1} (${otherServ?.nome ?? '—'}).` }
     }
 
     return null
@@ -1740,7 +1890,7 @@ const slotsDisponiveis = computed(() => {
   const agora = new Date()
   const result = []
 
-  for (let h = 7; h <= 21; h++) {
+  for (let h = 6; h <= 21; h++) {
     for (let m = 0; m < 60; m += 30) {
       const startStr = `${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       const inicio = new Date(startStr)
@@ -1879,9 +2029,17 @@ function abrirModalTarefa(dt = '', tarefa = null) {
       concluida: tarefa.concluida,
     }
   } else {
-    modalTarefaMode.value = 'create'
     const dtFmt = dt ? (dt.includes('T') ? dt.slice(0, 16) : dt + 'T09:00') : ''
-    formTarefa.value = { id: null, titulo: '', descricao: '', data_hora_inicio: dtFmt, data_hora_fim: '', responsavel_id: null, concluida: false }
+    modalTarefaMode.value = 'create'
+    formTarefa.value = {
+      id: null,
+      titulo: '',
+      descricao: '',
+      data_hora_inicio: dtFmt,
+      data_hora_fim: '',
+      responsavel_id: null,
+      concluida: false,
+    }
   }
   modalTarefaError.value = ''
   showModalTarefa.value = true
@@ -1943,10 +2101,19 @@ async function salvarModal() {
   }
   saving.value = true
   try {
+    const RRULE_MAP = {
+      weekly:   'FREQ=WEEKLY;INTERVAL=1',
+      biweekly: 'FREQ=WEEKLY;INTERVAL=2',
+      monthly:  'FREQ=MONTHLY;INTERVAL=1',
+    }
     const payload = {
       cliente_id: formData.value.cliente_id,
       cor_hex: normalizarHexColor(formData.value.cor_hex),
       observacoes: formData.value.observacoes || null,
+      recurrence: formData.value.recurrence
+        ? { freq: formData.value.recurrence, ...(formData.value.recurrence_count ? { count: formData.value.recurrence_count } : {}) }
+        : null,
+      edit_scope: formData.value.edit_scope,
       itens: formData.value.itens.map(i => ({
         servico_id: i.servico_id,
         profissional_id: i.profissional_id,
@@ -2002,21 +2169,28 @@ function setPagValorBase(preco) {
   basePagAg.value = v
   formPagAg.value.valor = v
   formPagAg.value.desconto = '0.00'
+  formPagAg.value.credito_utilizado = '0.00'
 }
 
 function abrirModalPagamento(ag) {
   agPagSelecionado.value = ag
   const total = totalAgPag(ag)
   basePagAg.value = total
-  formPagAg.value = { valor: total, desconto: '0.00', metodo: '', novoStatus: '' }
+  formPagAg.value = { valor: total, desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' }
   erroPagAg.value = ''
   modalPagAberto.value = true
 }
 
-watch(() => formPagAg.value.desconto, (desc) => {
+watch([() => formPagAg.value.desconto, () => formPagAg.value.credito_utilizado], ([desc, cred]) => {
   if (!agPagSelecionado.value) return
-  const newValor = Math.max(0, Number(basePagAg.value) - Number(desc)).toFixed(2)
+  const newValor = Math.max(0, Number(basePagAg.value) - Number(desc || 0) - Number(cred || 0)).toFixed(2)
   if (Number(newValor) !== Number(formPagAg.value.valor)) formPagAg.value.valor = newValor
+})
+
+const creditoGeradoAg = computed(() => {
+  if (formPagAg.value.metodo !== 'dinheiro') return 0
+  const valorDevido = Math.max(0, Number(basePagAg.value) - Number(formPagAg.value.desconto || 0) - Number(formPagAg.value.credito_utilizado || 0))
+  return Math.max(0, Number(formPagAg.value.valor) - valorDevido)
 })
 
 async function confirmarPagamentoAg() {
@@ -2031,6 +2205,7 @@ async function confirmarPagamentoAg() {
     await api.post(`/agendamentos/${agPagSelecionado.value.id}/pagamento`, {
       valor: formPagAg.value.valor,
       metodo: formPagAg.value.metodo,
+      credito_utilizado: formPagAg.value.credito_utilizado || 0,
     })
     modalPagAberto.value = false
     await fetchAgendamentos()
@@ -2046,13 +2221,21 @@ async function fetchAgendamentos(options = {}) {
     silent = false,
     mesesPassados = 3,
     mesesFuturos = 4,
+    merge = false,
+    fromDate = null,
+    toDate = null,
   } = options
 
   if (!silent) loading.value = true
-  const hoje = new Date()
-  // Janela configurável para permitir carga inicial rápida e hidratação em segundo plano.
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - mesesPassados, 1)
-  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + mesesFuturos, 0)
+  let inicio, fim
+  if (fromDate && toDate) {
+    inicio = new Date(fromDate)
+    fim = new Date(toDate)
+  } else {
+    const hoje = new Date()
+    inicio = new Date(hoje.getFullYear(), hoje.getMonth() - mesesPassados, 1)
+    fim = new Date(hoje.getFullYear(), hoje.getMonth() + mesesFuturos, 0)
+  }
   const params = {
     data_inicio: formatDateISOInSaoPaulo(inicio),
     data_fim: formatDateISOInSaoPaulo(fim),
@@ -2060,7 +2243,7 @@ async function fetchAgendamentos(options = {}) {
   if (filtroProfissional.value) params.profissional_id = filtroProfissional.value
   try {
     const { data } = await api.get('/agendamentos/', { params })
-    agendamentos.value = (data || []).map(ag => ({
+    const mapped = (data || []).map(ag => ({
       ...ag,
       itens: (ag.itens || []).map(item => ({
         ...item,
@@ -2068,10 +2251,31 @@ async function fetchAgendamentos(options = {}) {
         data_hora_fim: normalizarDataHoraApi(item.data_hora_fim),
       })),
     }))
+    if (merge) {
+      const incomingIds = new Set(mapped.map(a => a.id))
+      agendamentos.value = [...agendamentos.value.filter(a => !incomingIds.has(a.id)), ...mapped]
+    } else {
+      agendamentos.value = mapped
+    }
+    // Expandir o intervalo já carregado
+    if (!loadedFrom.value || inicio < loadedFrom.value) loadedFrom.value = inicio
+    if (!loadedTo.value || fim > loadedTo.value) loadedTo.value = fim
   } catch (e) {
     console.error('Erro ao carregar agendamentos:', e)
   } finally {
     if (!silent) loading.value = false
+  }
+}
+
+// Carrega o intervalo visível do calendário quando o usuário navega para fora da janela já carregada
+function onDatesSet(info) {
+  if (fetchingRange.value || !loadedFrom.value || !loadedTo.value) return
+  const viewStart = new Date(info.start)
+  const viewEnd = new Date(info.end)
+  if (viewStart < loadedFrom.value || viewEnd > loadedTo.value) {
+    fetchingRange.value = true
+    fetchAgendamentos({ silent: true, merge: true, fromDate: viewStart, toDate: viewEnd })
+      .finally(() => { fetchingRange.value = false })
   }
 }
 
@@ -2121,6 +2325,7 @@ function abrirDrawerCliente(cliente = null) {
         telefone: r.data.telefone || '',
         observacoes: r.data.observacoes || '',
         campos_dinamicos: r.data.campos_dinamicos ? JSON.parse(JSON.stringify(r.data.campos_dinamicos)) : [],
+        saldo_credito: r.data.saldo_credito ?? 0,
       }
     }).catch(() => {})
     fetchHistoricoCliente(cliente.id)
@@ -2273,11 +2478,11 @@ onMounted(async () => {
   carregarCoresFavoritas()
 
   // 1) Resposta rápida: janela menor para renderizar calendário mais cedo.
-  await fetchAgendamentos({ mesesPassados: 1, mesesFuturos: 2 })
+  await fetchAgendamentos({ mesesPassados: 12, mesesFuturos: 2 })
 
-  // 2) Hidratação em segundo plano: dados completos e auxiliares sem travar a primeira pintura.
+  // 2) Hidratação em segundo plano: estende histórico completo sem travar a primeira pintura.
   setTimeout(() => {
-    fetchAgendamentos({ silent: true, mesesPassados: 3, mesesFuturos: 4 })
+    fetchAgendamentos({ silent: true, merge: true, mesesPassados: 60, mesesFuturos: 4 })
     fetchClientes()
     fetchReferencias()
     fetchTarefas()
@@ -2318,7 +2523,7 @@ onMounted(async () => {
   outline: none !important;
 }
 .fc-wrapper .fc-timegrid-slot {
-  height: 2rem !important;
+  height: 1.5rem !important;
 }
 .fc-wrapper .fc-timegrid-event-harness {
   z-index: 1;
@@ -2359,6 +2564,7 @@ onMounted(async () => {
 }
 /* Layout flex-column (2-3 linhas) */
 .fc-wrapper .fc-event-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -2369,8 +2575,22 @@ onMounted(async () => {
   padding: 2px 4px;
   box-sizing: border-box;
 }
+/* Bandeirinha triangular de status — canto superior direito do card */
+.fc-wrapper .fc-ev-flag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 14px solid transparent; /* cor sobrescrita inline */
+  border-left: 14px solid transparent;
+  pointer-events: none;
+  z-index: 5;
+}
+
 /* Chip inline de linha única para eventos curtos (≤30 min) */
 .fc-wrapper .fc-ev-chip {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;

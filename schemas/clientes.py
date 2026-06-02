@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, EmailStr
@@ -31,4 +32,5 @@ class ClienteResponse(BaseModel):
     email: str | None
     observacoes: str | None = None
     campos_dinamicos: dict[str, Any] | list | None = None
+    saldo_credito: Decimal = Decimal("0.00")
     criado_em: UTCDatetime

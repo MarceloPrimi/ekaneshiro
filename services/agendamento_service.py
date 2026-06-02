@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import calendar
+import re
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,6 +19,34 @@ from services import calendario_google
 
 
 # ---------------------------------------------------------------------------
+# Helpers de negócio
+# ---------------------------------------------------------------------------
+
+def _is_primeira_vez(db: Session, cliente_id: int) -> bool:
+    """Retorna True se este é o primeiro agendamento não-cancelado do cliente."""
+    count = (
+        db.query(Agendamento)
+        .filter(
+            Agendamento.cliente_id == cliente_id,
+            Agendamento.status != StatusAgendamentoEnum.cancelado,
+        )
+        .count()
+    )
+    return count == 0
+
+
+def _build_mini_etiquetas(
+    etiquetas_payload: list[str] | None,
+    primeira_vez: bool,
+) -> list[str]:
+    """Mescla etiquetas manuais com a automática 'primeira_vez'."""
+    resultado: list[str] = list(etiquetas_payload or [])
+    if primeira_vez and "primeira_vez" not in resultado:
+        resultado.insert(0, "primeira_vez")
+    return resultado or None
+
+
+# ---------------------------------------------------------------------------
 # Helpers internos
 # ---------------------------------------------------------------------------
 
@@ -32,6 +62,83 @@ def _fmt_dt(dt) -> str:
     if isinstance(dt, datetime):
         return dt.strftime('%d/%m/%Y %H:%M')
     return str(dt)
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    """Add N months to a datetime, clamping day to month-end if necessary."""
+    month = dt.month - 1 + months
+    year = dt.year + month // 12
+    month = month % 12 + 1
+    day = min(dt.day, calendar.monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
+
+
+def _calcular_deltas_recorrencia(rrule: str, n: int) -> list:
+    """Returns list of callables (index -> timedelta or datetime offset) for recurrence."""
+    if 'FREQ=MONTHLY' in rrule:
+        return [('monthly', i) for i in range(1, n + 1)]
+    elif 'INTERVAL=2' in rrule:
+        return [('delta', timedelta(weeks=2 * i)) for i in range(1, n + 1)]
+    else:
+        return [('delta', timedelta(weeks=i)) for i in range(1, n + 1)]
+
+
+def _aplicar_offset(dt: datetime, offset) -> datetime:
+    kind, value = offset
+    if kind == 'monthly':
+        return _add_months(dt, value)
+    return dt + value
+
+
+def _deletar_filhos(db: Session, parent_id: int) -> None:
+    """Deletes all child appointments of a series (cascade removes their itens)."""
+    filhos = db.query(Agendamento).filter(Agendamento.parent_id == parent_id).all()
+    for filho in filhos:
+        db.delete(filho)
+    if filhos:
+        db.flush()
+
+
+def _criar_filhos_recorrentes(
+    db: Session,
+    parent: Agendamento,
+    itens_preparados: list,
+    rrule: str,
+    criado_por_id: int,
+) -> None:
+    """Creates recurring child appointments for a series."""
+    m_count = re.search(r'COUNT=(\d+)', rrule)
+    num = int(m_count.group(1)) if m_count else (6 if 'FREQ=MONTHLY' in rrule else 12)
+    offsets = _calcular_deltas_recorrencia(rrule, num)
+
+    for offset in offsets:
+        filho = Agendamento(
+            cliente_id=parent.cliente_id,
+            cor_hex=parent.cor_hex,
+            observacoes=parent.observacoes,
+            criado_por_id=criado_por_id,
+            categoria_id=parent.categoria_id,
+            recurrence_rule=None,
+            parent_id=parent.id,
+            mini_etiquetas=parent.mini_etiquetas,
+            primeira_vez=False,
+        )
+        db.add(filho)
+        db.flush()
+
+        for item, profissional, servico, fim in itens_preparados:
+            novo_inicio = _aplicar_offset(item.data_hora_inicio, offset)
+            novo_fim = _aplicar_offset(fim, offset)
+            db.add(
+                ItemAgendamento(
+                    agendamento_id=filho.id,
+                    servico_id=servico.id,
+                    profissional_id=profissional.id,
+                    data_hora_inicio=novo_inicio,
+                    data_hora_fim=novo_fim,
+                    google_event_id=None,
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -188,12 +295,24 @@ def criar_agendamento(
 
     # Cliente pode ter serviços simultâneos; bloqueio permanece apenas por profissional.
 
-    # 2. Persistir o cabeçalho do agendamento
+    # 2. Calcular primeira_vez ANTES de criar o agendamento (contagem atual = 0)
+    eh_primeira_vez = _is_primeira_vez(db, payload.cliente_id)
+    etiquetas = _build_mini_etiquetas(
+        [str(e) for e in payload.mini_etiquetas] if payload.mini_etiquetas else None,
+        eh_primeira_vez,
+    )
+    rrule = payload.recurrence.to_rrule() if payload.recurrence else None
+
+    # 3. Persistir o cabeçalho do agendamento
     agendamento = Agendamento(
         cliente_id=payload.cliente_id,
         cor_hex=payload.cor_hex,
         observacoes=payload.observacoes,
         criado_por_id=criado_por_id,
+        categoria_id=payload.categoria_id,
+        recurrence_rule=rrule,
+        mini_etiquetas=etiquetas,
+        primeira_vez=eh_primeira_vez,
     )
     db.add(agendamento)
     db.flush()  # Gera o ID sem commitar ainda
@@ -245,6 +364,18 @@ def criar_agendamento(
             detail="Erro ao sincronizar com o Google Calendar. Agendamento não foi salvo.",
         )
 
+    # Gerar ocorrências filhas para agendamentos recorrentes
+    if rrule:
+        try:
+            _criar_filhos_recorrentes(db, agendamento, itens_preparados, rrule, criado_por_id)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Erro ao gerar recorrências do agendamento.",
+            )
+
     db.refresh(agendamento)
     return agendamento
 
@@ -257,6 +388,7 @@ def atualizar_agendamento(
     db: Session,
     agendamento: Agendamento,
     payload,  # AgendamentoUpdate
+    criado_por_id: int | None = None,
 ) -> Agendamento:
     from schemas.agendamentos import AgendamentoUpdate  # evitar import circular
 
@@ -305,6 +437,13 @@ def atualizar_agendamento(
     agendamento.cliente_id = payload.cliente_id
     agendamento.cor_hex = payload.cor_hex
     agendamento.observacoes = payload.observacoes
+    agendamento.categoria_id = payload.categoria_id
+    new_rrule = payload.recurrence.to_rrule() if payload.recurrence else None
+    agendamento.recurrence_rule = new_rrule
+    agendamento.mini_etiquetas = (
+        [str(e) for e in payload.mini_etiquetas] if payload.mini_etiquetas is not None
+        else agendamento.mini_etiquetas
+    )
     db.flush()
 
     # 5. Inserir novos itens + Google Calendar
@@ -347,6 +486,43 @@ def atualizar_agendamento(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Erro ao sincronizar com o Google Calendar. Edição não foi salva.",
         )
+
+    # ── Gerenciar série recorrente ──────────────────────────────────────────
+    # Sempre que rrule mudar (adicionada, alterada ou removida), recriar filhos.
+    _deletar_filhos(db, agendamento.id)
+
+    if new_rrule:
+        _autor = criado_por_id or agendamento.criado_por_id
+        try:
+            _criar_filhos_recorrentes(db, agendamento, itens_preparados, new_rrule, _autor)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Erro ao gerar recorrências do agendamento.",
+            )
+    else:
+        db.commit()  # persiste a deleção de eventuais filhos antigos
+
+    # ── edit_scope = 'all': propagar alterações aos demais filhos da série ──
+    # Se este agendamento é um filho (tem parent_id) e o escopo é 'all',
+    # redirecionar a edição ao pai e recriar a série toda a partir do pai.
+    if getattr(payload, 'edit_scope', 'this') == 'all' and agendamento.parent_id is not None:
+        pai = db.query(Agendamento).filter(Agendamento.id == agendamento.parent_id).first()
+        if pai:
+            pai.cliente_id = agendamento.cliente_id
+            pai.cor_hex = agendamento.cor_hex
+            pai.observacoes = agendamento.observacoes
+            pai.categoria_id = agendamento.categoria_id
+            pai.recurrence_rule = new_rrule
+            _deletar_filhos(db, pai.id)
+            if new_rrule:
+                _criar_filhos_recorrentes(
+                    db, pai, itens_preparados, new_rrule,
+                    criado_por_id or pai.criado_por_id
+                )
+            db.commit()
 
     db.refresh(agendamento)
     return agendamento
@@ -401,6 +577,8 @@ def registrar_pagamento(
     payload: PagamentoCreate,
     registrado_por_id: int,
 ) -> Pagamento:
+    from decimal import Decimal
+    
     if agendamento.pagamento:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -412,13 +590,36 @@ def registrar_pagamento(
             detail="Não é possível registrar pagamento em agendamento cancelado.",
         )
 
+    cliente = agendamento.cliente
+    credito = payload.credito_utilizado
+
+    # Validação e consumo de crédito
+    if credito > 0:
+        if credito > cliente.saldo_credito:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Crédito insuficiente para abater o valor.",
+            )
+        cliente.saldo_credito -= credito
+
     pagamento = Pagamento(
         agendamento_id=agendamento.id,
         valor=payload.valor,
         metodo=payload.metodo,
+        credito_utilizado=credito,
         registrado_por_id=registrado_por_id,
     )
     db.add(pagamento)
+
+    # Geração de crédito por troco (quando o pagamento é em dinheiro)
+    # 1. Calculamos o valor total dos serviços
+    valor_servicos = sum(Decimal(str(item.servico.preco)) for item in agendamento.itens)
+    # 2. O valor devido é o total de serviços abatendo o crédito já utilizado
+    valor_devido = valor_servicos - credito
+    
+    if payload.metodo == "dinheiro" and payload.valor > valor_devido:
+        troco_credito = payload.valor - valor_devido
+        cliente.saldo_credito += troco_credito
 
     # Pagamento confirma automaticamente o agendamento
     agendamento.status = StatusAgendamentoEnum.confirmado
