@@ -126,6 +126,17 @@
             @click="mostrarTarefas = !mostrarTarefas"
           >Tarefas no calendário</button>
 
+          <button
+            v-if="isRecepcionistaOuAdmin"
+            class="h-11 px-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
+            title="Gerenciar feriados e dias bloqueados"
+            @click="abrirModalFeriado()"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path stroke-linecap="round" d="M9 16l2 2 4-4"/></svg>
+            Feriados
+            <span v-if="feriados.filter(f=>f.bloquear_agenda).length" class="bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ feriados.filter(f=>f.bloquear_agenda).length }}</span>
+          </button>
+
           <template v-if="isRecepcionistaOuAdmin">
             <button
               class="h-11 px-3 border rounded-lg text-sm"
@@ -232,7 +243,35 @@
         componente antigo e criar um novo, aplicando a initialView correta.
         Isso é mais limpo do que manipular a API imperativa do FullCalendar.
       -->
-      <FullCalendar v-if="!loading" :key="isMobile ? 'fc-m' : 'fc-d'" :options="calendarOptions" />
+      <!-- Filtro anual: seletor de mês/ano para navegação rápida sem clicar prev/next várias vezes -->
+      <div class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+        <label class="text-xs text-gray-500 font-medium whitespace-nowrap">Ir para:</label>
+        <select
+          v-model="filtroAno"
+          class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          @change="navegarParaMesAno"
+        >
+          <option v-for="a in anosDisponiveis" :key="a" :value="a">{{ a }}</option>
+        </select>
+        <select
+          v-model="filtroMes"
+          class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          @change="navegarParaMesAno"
+        >
+          <option v-for="(nome, idx) in MESES_PT" :key="idx" :value="idx">{{ nome }}</option>
+        </select>
+        <button
+          class="text-xs px-2 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+          @click="navegarParaHoje"
+        >Hoje</button>
+      </div>
+
+      <FullCalendar
+        v-if="!loading"
+        ref="calendarRef"
+        :key="isMobile ? 'fc-m' : 'fc-d'"
+        :options="calendarOptions"
+      />
       <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
     </div>
 
@@ -889,7 +928,13 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Telefone</label>
                 <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400 h-11">
-                  <span class="flex items-center gap-1 px-3 py-2 bg-gray-50 text-sm text-gray-600 border-r border-gray-200 select-none whitespace-nowrap h-full">🇧🇷 +55</span>
+                  <select
+                    v-model="ddiCliente"
+                    class="bg-gray-50 text-sm text-gray-600 border-r border-gray-200 px-2 h-full focus:outline-none"
+                    style="min-width: 6rem; max-width: 7rem"
+                  >
+                    <option v-for="p in DDI_PAISES" :key="p.ddi" :value="p.ddi">{{ p.label }}</option>
+                  </select>
                   <!--
                     type="tel" abre o teclado numérico no iOS/Android (com traços e parênteses).
                     inputmode="tel" reforça isso em browsers que ignoram o type.
@@ -1033,7 +1078,16 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-            <input v-model="formClienteRapido.telefone" type="tel" inputmode="tel" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 h-11" placeholder="(11) 99999-9999" />
+            <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400 h-11">
+              <select
+                v-model="ddiClienteRapido"
+                class="bg-gray-50 text-sm text-gray-600 border-r border-gray-200 px-2 h-full focus:outline-none"
+                style="min-width: 6rem; max-width: 7rem"
+              >
+                <option v-for="p in DDI_PAISES" :key="p.ddi" :value="p.ddi">{{ p.label }}</option>
+              </select>
+              <input v-model="formClienteRapido.telefone" type="tel" inputmode="tel" class="flex-1 px-3 py-2 text-sm focus:outline-none h-full" placeholder="(11) 99999-9999" />
+            </div>
           </div>
           <p v-if="erroClienteRapido" class="text-sm text-red-500">{{ erroClienteRapido }}</p>
           <div class="flex gap-2 pt-2">
@@ -1057,11 +1111,59 @@
       @select:tarefa="(dt) => { decisionModal.show = false; abrirModalTarefa(dt) }"
     />
 
+    <!-- Modal de Feriado / Dia Bloqueado -->
+    <div v-if="showModalFeriado" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+        <h3 class="text-base font-bold text-gray-800">
+          {{ formFeriado.id ? 'Editar Feriado' : 'Novo Feriado / Dia Bloqueado' }}
+        </h3>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Data</label>
+          <input
+            v-model="formFeriado.data"
+            type="date"
+            :disabled="!!formFeriado.id"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:bg-gray-50 disabled:text-gray-400"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Nome / Descrição</label>
+          <input
+            v-model="formFeriado.nome"
+            type="text"
+            placeholder="Ex: Natal, Feriado municipal..."
+            class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+          />
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer select-none">
+          <input v-model="formFeriado.bloquear_agenda" type="checkbox" class="w-4 h-4 accent-rose-600" />
+          <span class="text-sm text-gray-700">Bloquear agenda neste dia</span>
+        </label>
+        <p v-if="formFeriado.bloquear_agenda" class="text-xs text-rose-600 -mt-2 pl-7">
+          Nenhum agendamento poderá ser criado nesta data.
+        </p>
+        <p v-if="erroFeriado" class="text-sm text-red-500">{{ erroFeriado }}</p>
+        <div class="flex gap-2 pt-1">
+          <button
+            type="button"
+            class="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm hover:bg-gray-50"
+            @click="showModalFeriado = false"
+          >Cancelar</button>
+          <button
+            type="button"
+            :disabled="savingFeriado"
+            class="flex-1 bg-rose-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
+            @click="salvarFeriado"
+          >{{ savingFeriado ? 'Salvando...' : 'Salvar' }}</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Calendar, ClipboardList, ChevronDown } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import FullCalendar from '@fullcalendar/vue3'
@@ -1188,6 +1290,11 @@ const colunaPorProfissional = ref(false)
 
 // Tarefas internas
 const tarefas = ref([])
+const feriados = ref([])
+const showModalFeriado = ref(false)
+const savingFeriado = ref(false)
+const erroFeriado = ref('')
+const formFeriado = ref({ id: null, data: '', nome: '', bloquear_agenda: false })
 const showModalTarefa = ref(false)
 const modalTarefaMode = ref('create')
 const savingTarefa = ref(false)
@@ -1202,6 +1309,41 @@ const savingCliente = ref(false)
 const erroCliente = ref('')
 const editandoCamposPainel = ref(false)
 const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [] })
+
+// DDI: separamos DDI e número para exibição; na persistência armazenamos no campo telefone
+const DDI_PAISES = [
+  { ddi: '+55', label: '🇧🇷 +55 Brasil' },
+  { ddi: '+1',  label: '🇺🇸 +1 EUA / Canadá' },
+  { ddi: '+54', label: '🇦🇷 +54 Argentina' },
+  { ddi: '+56', label: '🇨🇱 +56 Chile' },
+  { ddi: '+51', label: '🇵🇪 +51 Peru' },
+  { ddi: '+57', label: '🇨🇴 +57 Colômbia' },
+  { ddi: '+595', label: '🇵🇾 +595 Paraguai' },
+  { ddi: '+598', label: '🇺🇾 +598 Uruguai' },
+  { ddi: '+34', label: '🇪🇸 +34 Espanha' },
+  { ddi: '+351', label: '🇵🇹 +351 Portugal' },
+  { ddi: '+44', label: '🇬🇧 +44 Reino Unido' },
+  { ddi: '+49', label: '🇩🇪 +49 Alemanha' },
+  { ddi: '+39', label: '🇮🇹 +39 Itália' },
+  { ddi: '+81', label: '🇯🇵 +81 Japão' },
+]
+const ddiCliente = ref('+55')
+const ddiClienteRapido = ref('+55')
+
+/** Extrai DDI e número de um telefone armazenado. */
+function parseTelefone(tel) {
+  if (!tel) return { ddi: '+55', numero: '' }
+  const match = DDI_PAISES.find(p => tel.startsWith(p.ddi + ' '))
+  if (match) return { ddi: match.ddi, numero: tel.slice(match.ddi.length + 1) }
+  // Telefone sem DDI explícito (legado) — assumir +55
+  return { ddi: '+55', numero: tel }
+}
+
+/** Combina DDI + número para armazenar. */
+function montarTelefone(ddi, numero) {
+  if (!numero) return null
+  return `${ddi} ${numero}`
+}
 const historicoCliente = ref([])
 const loadingHistoricoCliente = ref(false)
 const buscaCliente = ref('')
@@ -1291,21 +1433,100 @@ watch(detalheAg, (ag) => {
 const clientesFiltrados = computed(() => {
   const q = buscaCliente.value.trim().toLowerCase()
   if (!q) return clientes.value
-  return clientes.value.filter(c => c.nome.toLowerCase().includes(q))
+  const qDigits = normalizarTelefone(q)
+  const isTelBusca = /^\d{4,}$/.test(qDigits)
+  return clientes.value.filter(c => {
+    if (c.nome.toLowerCase().includes(q)) return true
+    if (isTelBusca && c.telefone) return normalizarTelefone(c.telefone).includes(qDigits)
+    return false
+  })
 })
 
 // Autocomplete de cliente no modal de agendamento
 const clienteBuscaNome = ref('')
 const showBuscaDropdown = ref(false)
+
+/** Normaliza telefone para comparação: remove +, espaços, traços, parênteses. */
+function normalizarTelefone(tel) {
+  return (tel || '').replace(/[\s\-().+]/g, '')
+}
+
 const clientesBuscaFiltrados = computed(() => {
   const q = clienteBuscaNome.value.trim().toLowerCase()
   if (!q) return clientes.value.slice(0, 20)
-  return clientes.value.filter(c => c.nome.toLowerCase().includes(q))
+
+  const qDigits = normalizarTelefone(q)
+  // Se a busca contém apenas dígitos (possível número de telefone), busca por telefone
+  const isTelBusca = /^\d{4,}$/.test(qDigits)
+
+  return clientes.value.filter(c => {
+    if (c.nome.toLowerCase().includes(q)) return true
+    if (isTelBusca && c.telefone) {
+      const telNorm = normalizarTelefone(c.telefone)
+      return telNorm.includes(qDigits)
+    }
+    return false
+  })
 })
+
 function selectCliente(c) {
   formData.value.cliente_id = c.id
+  // Sempre exibe o NOME do cliente (nunca o telefone) no campo de busca
   clienteBuscaNome.value = c.nome
   showBuscaDropdown.value = false
+}
+
+// ─── Filtro Anual / Navegação por mês ──────────────────────────────────────
+const calendarRef = ref(null)
+const hoje = new Date()
+const filtroAno = ref(hoje.getFullYear())
+const filtroMes = ref(hoje.getMonth())
+
+const MESES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+const anosDisponiveis = computed(() => {
+  const base = new Date().getFullYear()
+  return Array.from({ length: 5 }, (_, i) => base - 2 + i)
+})
+
+function navegarParaMesAno() {
+  const target = new Date(filtroAno.value, filtroMes.value, 1)
+  const api = calendarRef.value?.getApi?.()
+  if (api) {
+    api.gotoDate(target)
+  }
+  // Carrega o mês selecionado se ainda não está na janela carregada
+  const inicio = new Date(filtroAno.value, filtroMes.value, 1)
+  const fim = new Date(filtroAno.value, filtroMes.value + 1, 0)
+  if (!loadedFrom.value || inicio < loadedFrom.value || fim > loadedTo.value) {
+    fetchAgendamentos({ silent: true, merge: true, fromDate: inicio, toDate: fim })
+  }
+}
+
+function navegarParaHoje() {
+  const now = new Date()
+  filtroAno.value = now.getFullYear()
+  filtroMes.value = now.getMonth()
+  const api = calendarRef.value?.getApi?.()
+  if (api) api.today()
+}
+
+// Sincroniza os selects quando o usuário navega com prev/next do FullCalendar
+function onDatesSet(info) {
+  const viewStart = new Date(info.start)
+  filtroAno.value = viewStart.getFullYear()
+  filtroMes.value = viewStart.getMonth()
+
+  if (fetchingRange.value || !loadedFrom.value || !loadedTo.value) return
+  const viewEnd = new Date(info.end)
+  if (viewStart < loadedFrom.value || viewEnd > loadedTo.value) {
+    fetchingRange.value = true
+    fetchAgendamentos({ silent: true, merge: true, fromDate: viewStart, toDate: viewEnd })
+      .finally(() => { fetchingRange.value = false })
+  }
 }
 
 // ─── FullCalendar ──────────────────────────────────────────────────────────
@@ -1436,9 +1657,25 @@ const calendarEventsTarefas = computed(() => {
     })
 })
 
+// Feriados como eventos de dia inteiro no calendário
+const calendarEventsFeriados = computed(() =>
+  feriados.value.map(f => ({
+    id: `feriado-${f.id}`,
+    title: f.bloquear_agenda ? `🚫 ${f.nome}` : `🗓️ ${f.nome}`,
+    start: f.data,
+    allDay: true,
+    backgroundColor: f.bloquear_agenda ? '#fef2f2' : '#fefce8',
+    borderColor: f.bloquear_agenda ? '#ef4444' : '#f59e0b',
+    textColor: f.bloquear_agenda ? '#b91c1c' : '#92400e',
+    extendedProps: { feriado: f, tipo: 'feriado' },
+    display: 'block',
+  }))
+)
+
 const allCalendarEvents = computed(() => [
   ...calendarEvents.value,
   ...(mostrarTarefas.value ? calendarEventsTarefas.value : []),
+  ...calendarEventsFeriados.value,
 ])
 
 // Na visão diária por colunas, quando um profissional está filtrado,
@@ -1605,12 +1842,31 @@ function renderEventContent(arg) {
   }
   const clienteDisplayCurto = nomeClienteResumido(clienteNome)
   const te = escapeHtml
-  const tooltipText = te(`Cliente: ${clienteNome}\nStatus: ${ag?.status || 'Sem status'}\nProfissional: ${profNome}`)
+
+  // Tooltip rico: todos os itens (serviço + profissional + horário)
+  const itensTexto = (ag?.itens ?? []).map(item => {
+    const hItem = item.data_hora_inicio
+      ? new Date(item.data_hora_inicio).toLocaleTimeString('pt-BR', {
+          hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+        })
+      : ''
+    const servItem = item.servico?.nome ?? ''
+    const profItem = item.profissional?.nome ?? ''
+    return `• ${servItem}${profItem ? ` (${profItem})` : ''}${hItem ? ` – ${hItem}` : ''}`
+  }).join('\n')
+
+  const pagInfo = ag?.pagamento
+    ? `\nPagamento: R$ ${Number(ag.pagamento.valor).toFixed(2)} (${ag.pagamento.metodo})`
+    : ''
+  const obsInfo = ag?.observacoes ? `\nObs: ${ag.observacoes}` : ''
+  const tooltipText = te(
+    `${clienteNome}\nStatus: ${STATUS_LABELS[ag?.status] ?? ag?.status ?? '—'}\n${itensTexto}${pagInfo}${obsInfo}`
+  )
 
   // ≤ 30 min (~48px): linha única compacta
   if (durMin <= 30) {
     return {
-      html: `<div class="fc-ev-chip" title="${tooltipText}">`
+      html: `<div class="fc-ev-chip" data-tooltip="${tooltipText}">`
         + flag
         + `<span class="fc-ev-chip-name">${te(clienteDisplayCurto)}</span>`
         + (hora ? `<span class="fc-ev-chip-sep">·</span><span class="fc-ev-chip-time">${te(hora)}</span>` : '')
@@ -1622,7 +1878,7 @@ function renderEventContent(arg) {
   if (durMin <= 60) {
     const sub = [servNome, firstName(profNome)].filter(Boolean).join(' · ')
     return {
-      html: `<div class="fc-event-inner" title="${tooltipText}">`
+      html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
         + flag
         + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
@@ -1630,13 +1886,17 @@ function renderEventContent(arg) {
     }
   }
 
-  // > 60 min: layout completo — nome + serviço + prof · hora
+  // > 60 min: layout completo — nome + todos os serviços + prof · hora
+  const todosServicos = (ag?.itens ?? [])
+    .map(item => item.servico?.nome)
+    .filter(Boolean)
+    .join(' + ')
   const sub2 = [firstName(profNome), hora].filter(Boolean).join(' · ')
   return {
-    html: `<div class="fc-event-inner" title="${tooltipText}">`
+    html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
       + flag
       + `<div class="fc-ev-title">${te(clienteNome)}</div>`
-      + (servNome ? `<div class="fc-ev-sub">${te(servNome)}</div>` : '')
+      + (todosServicos ? `<div class="fc-ev-sub">${te(todosServicos)}</div>` : '')
       + (sub2 ? `<div class="fc-ev-sub">${te(sub2)}</div>` : '')
       + `</div>`,
   }
@@ -1645,25 +1905,64 @@ function renderEventContent(arg) {
 function onEventClick(info) {
   if (info.event.extendedProps.tipo === 'tarefa') {
     detalheTarefa.value = info.event.extendedProps.tarefa
+  } else if (info.event.extendedProps.tipo === 'feriado') {
+    if (isRecepcionistaOuAdmin.value) abrirModalEditarFeriado(info.event.extendedProps.feriado)
   } else {
     detalheAg.value = info.event.extendedProps.ag
   }
 }
 
+let _tooltipEl = null
+
+function _destroyTooltip() {
+  if (_tooltipEl) {
+    _tooltipEl.remove()
+    _tooltipEl = null
+  }
+}
+
+function _showTooltip(text, anchorEl) {
+  _destroyTooltip()
+  const tip = document.createElement('div')
+  tip.className = 'sgk-rich-tooltip'
+  // Cada linha com quebra real no HTML
+  tip.innerHTML = text
+    .split('\n')
+    .map(l => `<span>${l}</span>`)
+    .join('')
+  document.body.appendChild(tip)
+  _tooltipEl = tip
+
+  const rect = anchorEl.getBoundingClientRect()
+  const tipW = 280
+  let left = rect.right + 8
+  if (left + tipW > window.innerWidth - 8) left = rect.left - tipW - 8
+  let top = rect.top
+  if (top + tip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - tip.offsetHeight - 8
+  tip.style.left = `${Math.max(8, left)}px`
+  tip.style.top = `${Math.max(8, top)}px`
+}
+
 function onEventDidMount(info) {
   if (info.event.extendedProps.tipo === 'tarefa') return
-  const statusLabel = info.event.extendedProps.statusLabel || 'Sem status'
-  info.el.title = `Status: ${statusLabel}`
 
   // O z-index efetivo no timeGrid fica no harness; elevar no hover traz o card para frente.
   const harness = info.el.closest('.fc-timegrid-event-harness')
-  if (!harness) return
+  if (harness) {
+    info.el.addEventListener('mouseenter', () => { harness.style.zIndex = '40' })
+    info.el.addEventListener('mouseleave', () => { harness.style.zIndex = '1' })
+  }
+
+  // Tooltip rico usando o atributo data-tooltip preenchido em renderEventContent
+  const inner = info.el.querySelector('[data-tooltip]')
+  if (!inner) return
+
   info.el.addEventListener('mouseenter', () => {
-    harness.style.zIndex = '40'
+    const text = inner.getAttribute('data-tooltip') || ''
+    if (text) _showTooltip(text, info.el)
   })
-  info.el.addEventListener('mouseleave', () => {
-    harness.style.zIndex = '1'
-  })
+  info.el.addEventListener('mouseleave', _destroyTooltip)
+  info.el.addEventListener('click', _destroyTooltip)
 }
 
 function onDateClick(info) {
@@ -1680,7 +1979,7 @@ async function onEventDrop(info) {
   const ag = info.event.extendedProps.ag
   const delta = info.event.start - new Date(ag.itens?.[0]?.data_hora_inicio)
   try {
-    await api.put(`/agendamentos/${ag.id}`, {
+    const { data } = await api.put(`/agendamentos/${ag.id}`, {
       cliente_id: ag.cliente_id,
       observacoes: ag.observacoes || null,
       itens: ag.itens.map(i => ({
@@ -1689,7 +1988,8 @@ async function onEventDrop(info) {
         data_hora_inicio: toDatetimeLocal(new Date(new Date(i.data_hora_inicio).getTime() + delta)),
       })),
     })
-    await fetchAgendamentos()
+    // Atualiza localmente — mantém a view atual do calendário
+    _upsertAgendamentoLocal(data)
   } catch (e) {
     info.revert()
     alert(e.response?.data?.detail || 'Erro ao mover agendamento.')
@@ -1952,7 +2252,10 @@ async function salvarClienteRapido() {
   erroClienteRapido.value = ''
   savingClienteRapido.value = true
   try {
-    const { data: novoCliente } = await api.post('/clientes/', formClienteRapido.value)
+    const { data: novoCliente } = await api.post('/clientes/', {
+      nome: formClienteRapido.value.nome,
+      telefone: montarTelefone(ddiClienteRapido.value, formClienteRapido.value.telefone),
+    })
     clientes.value = [...clientes.value, novoCliente].sort((a, b) => a.nome.localeCompare(b.nome))
     formData.value.cliente_id = novoCliente.id
     clienteBuscaNome.value = novoCliente.nome
@@ -2093,19 +2396,106 @@ async function fetchTarefas() {
   } catch (e) { console.error('Erro ao carregar tarefas:', e) }
 }
 
+// ─── Feriados ──────────────────────────────────────────────────────────────
+async function fetchFeriados() {
+  try {
+    const { data } = await api.get('/feriados/')
+    feriados.value = data || []
+  } catch (e) { console.error('Erro ao carregar feriados:', e) }
+}
+
+/** Retorna o feriado bloqueado para uma data (YYYY-MM-DD), ou null. */
+function feriadoBloqueadoNaData(dataStr) {
+  return feriados.value.find(f => f.data === dataStr && f.bloquear_agenda) ?? null
+}
+
+function abrirModalFeriado(dataStr = '') {
+  formFeriado.value = { id: null, data: dataStr, nome: '', bloquear_agenda: false }
+  erroFeriado.value = ''
+  showModalFeriado.value = true
+}
+
+function abrirModalEditarFeriado(f) {
+  formFeriado.value = { id: f.id, data: f.data, nome: f.nome, bloquear_agenda: f.bloquear_agenda }
+  erroFeriado.value = ''
+  showModalFeriado.value = true
+}
+
+async function salvarFeriado() {
+  erroFeriado.value = ''
+  if (!formFeriado.value.data || !formFeriado.value.nome.trim()) {
+    erroFeriado.value = 'Preencha data e nome.'
+    return
+  }
+  savingFeriado.value = true
+  try {
+    if (formFeriado.value.id) {
+      const { data } = await api.patch(`/feriados/${formFeriado.value.id}`, {
+        nome: formFeriado.value.nome,
+        bloquear_agenda: formFeriado.value.bloquear_agenda,
+      })
+      const idx = feriados.value.findIndex(f => f.id === data.id)
+      if (idx >= 0) feriados.value[idx] = data
+    } else {
+      const { data } = await api.post('/feriados/', {
+        data: formFeriado.value.data,
+        nome: formFeriado.value.nome,
+        bloquear_agenda: formFeriado.value.bloquear_agenda,
+      })
+      feriados.value = [...feriados.value, data].sort((a, b) => a.data.localeCompare(b.data))
+    }
+    showModalFeriado.value = false
+    toastSucesso('Feriado salvo!')
+  } catch (e) {
+    erroFeriado.value = e.response?.data?.detail || 'Erro ao salvar feriado.'
+  } finally {
+    savingFeriado.value = false
+  }
+}
+
+async function removerFeriado(f) {
+  if (!confirm(`Remover o feriado "${f.nome}"?`)) return
+  await api.delete(`/feriados/${f.id}`)
+  feriados.value = feriados.value.filter(x => x.id !== f.id)
+  toastSucesso('Feriado removido.')
+}
+
+/** Injeta ou substitui um agendamento no array local (sem refetch completo). */
+function _upsertAgendamentoLocal(ag) {
+  const normalizado = {
+    ...ag,
+    itens: (ag.itens || []).map(item => ({
+      ...item,
+      data_hora_inicio: normalizarDataHoraApi(item.data_hora_inicio),
+      data_hora_fim: normalizarDataHoraApi(item.data_hora_fim),
+    })),
+  }
+  const idx = agendamentos.value.findIndex(a => a.id === normalizado.id)
+  if (idx >= 0) {
+    agendamentos.value[idx] = normalizado
+  } else {
+    agendamentos.value = [normalizado, ...agendamentos.value]
+  }
+}
+
 async function salvarModal() {
   modalError.value = ''
   if (!formData.value.cliente_id) {
     modalError.value = 'Selecione um cliente da lista.'
     return
   }
+  // Verificar se algum item cai em dia com agenda bloqueada por feriado
+  for (const item of formData.value.itens) {
+    if (!item.data_hora_inicio) continue
+    const dataStr = item.data_hora_inicio.slice(0, 10)
+    const feriado = feriadoBloqueadoNaData(dataStr)
+    if (feriado) {
+      modalError.value = `Agenda bloqueada em ${dataStr}: ${feriado.nome}. Remova o bloqueio nas configurações de feriados para agendar neste dia.`
+      return
+    }
+  }
   saving.value = true
   try {
-    const RRULE_MAP = {
-      weekly:   'FREQ=WEEKLY;INTERVAL=1',
-      biweekly: 'FREQ=WEEKLY;INTERVAL=2',
-      monthly:  'FREQ=MONTHLY;INTERVAL=1',
-    }
     const payload = {
       cliente_id: formData.value.cliente_id,
       cor_hex: normalizarHexColor(formData.value.cor_hex),
@@ -2121,14 +2511,18 @@ async function salvarModal() {
         data_hora_fim: i.data_hora_fim || null,
       })),
     }
+    let respData
     if (modalMode.value === 'edit') {
-      await api.put(`/agendamentos/${formData.value.id}`, payload)
+      const { data } = await api.put(`/agendamentos/${formData.value.id}`, payload)
+      respData = data
     } else {
-      await api.post('/agendamentos/', payload)
+      const { data } = await api.post('/agendamentos/', payload)
+      respData = data
     }
+    // Atualiza localmente sem refetch completo — mantém a view atual do calendário
+    _upsertAgendamentoLocal(respData)
     showModal.value = false
     toastSucesso(modalMode.value === 'edit' ? 'Agendamento atualizado!' : 'Agendamento criado!')
-    await fetchAgendamentos()
   } catch (e) {
     modalError.value = e.response?.data?.detail || 'Erro ao salvar.'
   } finally {
@@ -2136,8 +2530,29 @@ async function salvarModal() {
   }
 }
 
-function alterarStatus(id, status) {
-  api.patch(`/agendamentos/${id}/status`, { status }).then(fetchAgendamentos)
+function alterarStatus(id, novoStatus) {
+  const idx = agendamentos.value.findIndex(a => a.id === id)
+  if (idx < 0) return
+  const original = agendamentos.value[idx].status
+
+  // Optimistic update: reflete na UI instantaneamente (sem travar por round-trip)
+  agendamentos.value[idx] = { ...agendamentos.value[idx], status: novoStatus }
+  if (detalheAg.value?.id === id) {
+    detalheAg.value = { ...detalheAg.value, status: novoStatus }
+  }
+
+  api.patch(`/agendamentos/${id}/status`, { status: novoStatus })
+    .then(({ data }) => {
+      // Confirma com dados do servidor (pode ter campos extras atualizados)
+      _upsertAgendamentoLocal(data)
+      if (detalheAg.value?.id === id) detalheAg.value = { ...detalheAg.value, ...data }
+    })
+    .catch(() => {
+      // Reverte se falhou
+      agendamentos.value[idx] = { ...agendamentos.value[idx], status: original }
+      if (detalheAg.value?.id === id) detalheAg.value = { ...detalheAg.value, status: original }
+      toastSucesso('Erro ao atualizar status — alteração revertida.')
+    })
 }
 
 function confirmarExcluirAg(ag) {
@@ -2148,10 +2563,14 @@ function confirmarExcluirAg(ag) {
 async function excluirAgendamento() {
   if (!agParaExcluir.value) return
   excluindoAg.value = true
+  const id = agParaExcluir.value.id
   try {
-    await api.delete(`/agendamentos/${agParaExcluir.value.id}`)
+    await api.delete(`/agendamentos/${id}`)
+    // Remove localmente sem refetch completo — mantém a view atual do calendário
+    agendamentos.value = agendamentos.value.filter(a => a.id !== id)
     agParaExcluir.value = null
-    await fetchAgendamentos()
+    detalheAg.value = null
+    toastSucesso('Agendamento excluído.')
   } catch (e) {
     alert(e.response?.data?.detail || 'Erro ao excluir agendamento.')
   } finally {
@@ -2198,17 +2617,25 @@ async function confirmarPagamentoAg() {
   erroPagAg.value = ''
   try {
     if (formPagAg.value.novoStatus) {
-      await api.patch(`/agendamentos/${agPagSelecionado.value.id}/status`, {
-        status: formPagAg.value.novoStatus,
-      })
+      const { data: agAtualizado } = await api.patch(
+        `/agendamentos/${agPagSelecionado.value.id}/status`,
+        { status: formPagAg.value.novoStatus },
+      )
+      _upsertAgendamentoLocal(agAtualizado)
     }
-    await api.post(`/agendamentos/${agPagSelecionado.value.id}/pagamento`, {
-      valor: formPagAg.value.valor,
-      metodo: formPagAg.value.metodo,
-      credito_utilizado: formPagAg.value.credito_utilizado || 0,
-    })
+    const { data: pagamento } = await api.post(
+      `/agendamentos/${agPagSelecionado.value.id}/pagamento`,
+      {
+        valor: formPagAg.value.valor,
+        metodo: formPagAg.value.metodo,
+        credito_utilizado: formPagAg.value.credito_utilizado || 0,
+      },
+    )
+    // Atualiza pagamento no agendamento local
+    const idx = agendamentos.value.findIndex(a => a.id === agPagSelecionado.value.id)
+    if (idx >= 0) agendamentos.value[idx] = { ...agendamentos.value[idx], pagamento }
     modalPagAberto.value = false
-    await fetchAgendamentos()
+    toastSucesso('Pagamento registrado!')
   } catch (e) {
     erroPagAg.value = e.response?.data?.detail || 'Erro ao registrar pagamento.'
   } finally {
@@ -2267,17 +2694,7 @@ async function fetchAgendamentos(options = {}) {
   }
 }
 
-// Carrega o intervalo visível do calendário quando o usuário navega para fora da janela já carregada
-function onDatesSet(info) {
-  if (fetchingRange.value || !loadedFrom.value || !loadedTo.value) return
-  const viewStart = new Date(info.start)
-  const viewEnd = new Date(info.end)
-  if (viewStart < loadedFrom.value || viewEnd > loadedTo.value) {
-    fetchingRange.value = true
-    fetchAgendamentos({ silent: true, merge: true, fromDate: viewStart, toDate: viewEnd })
-      .finally(() => { fetchingRange.value = false })
-  }
-}
+// onDatesSet está definido acima no bloco "Filtro Anual / Navegação por mês"
 
 watch(filtroProfissional, () => fetchAgendamentos())
 
@@ -2306,9 +2723,11 @@ const historicoClienteItens = computed(() => {
 
 function abrirDrawerCliente(cliente = null) {
   clienteSelecionadoPainel.value = cliente
+  const parsed = parseTelefone(cliente?.telefone)
+  ddiCliente.value = parsed.ddi
   formCliente.value = {
     nome: cliente?.nome || '',
-    telefone: cliente?.telefone || '',
+    telefone: parsed.numero,
     observacoes: cliente?.observacoes || '',
     campos_dinamicos: cliente?.campos_dinamicos ? JSON.parse(JSON.stringify(cliente.campos_dinamicos)) : [],
   }
@@ -2317,12 +2736,13 @@ function abrirDrawerCliente(cliente = null) {
   historicoCliente.value = []
   clienteDrawer.value = true
   if (cliente?.id) {
-    // Busca o cliente completo para garantir todos os campos atualizados
     api.get(`/clientes/${cliente.id}`).then(r => {
       clienteSelecionadoPainel.value = r.data
+      const p = parseTelefone(r.data.telefone)
+      ddiCliente.value = p.ddi
       formCliente.value = {
         nome: r.data.nome || '',
-        telefone: r.data.telefone || '',
+        telefone: p.numero,
         observacoes: r.data.observacoes || '',
         campos_dinamicos: r.data.campos_dinamicos ? JSON.parse(JSON.stringify(r.data.campos_dinamicos)) : [],
         saldo_credito: r.data.saldo_credito ?? 0,
@@ -2348,7 +2768,7 @@ async function salvarCliente() {
   try {
     const payload = {
       nome: formCliente.value.nome,
-      telefone: formCliente.value.telefone || null,
+      telefone: montarTelefone(ddiCliente.value, formCliente.value.telefone),
       observacoes: formCliente.value.observacoes || null,
       campos_dinamicos: formCliente.value.campos_dinamicos.length ? formCliente.value.campos_dinamicos : null,
     }
@@ -2477,30 +2897,58 @@ async function fetchReferencias() {
 onMounted(async () => {
   carregarCoresFavoritas()
 
-  // ── Estágio 1: SEMANA ATUAL primeiro ───────────────────────────────────────
-  // A recepcionista abre sempre na visão semanal. Buscamos só ~2 semanas
-  // (hoje ±10 dias) para um payload mínimo e pintar o calendário quase imediato.
-  const hoje = new Date()
-  const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
-  const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
-  await fetchAgendamentos({ fromDate: semanaInicio, toDate: semanaFim })
+  // ── Estágio 1: /dashboard/init — 1 request carrega semana atual + referências ──
+  // Substitui 6 requests separadas (servicos, profissionais, agendamentos,
+  // tarefas) por uma única, eliminando o blocked/queued time do browser.
+  try {
+    loading.value = true
+    const { data: init } = await api.get('/dashboard/init')
+
+    servicos.value = init.servicos.filter(sv => sv.ativo !== false)
+    profissionais.value = init.profissionais
+
+    const hoje = new Date()
+    const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
+    const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
+    const mapped = (init.agendamentos || []).map(ag => ({
+      ...ag,
+      itens: (ag.itens || []).map(item => ({
+        ...item,
+        data_hora_inicio: normalizarDataHoraApi(item.data_hora_inicio),
+        data_hora_fim: normalizarDataHoraApi(item.data_hora_fim),
+      })),
+    }))
+    agendamentos.value = mapped
+    loadedFrom.value = semanaInicio
+    loadedTo.value = semanaFim
+
+    tarefas.value = (init.tarefas || []).map(t => ({
+      ...t,
+      data_hora_inicio: normalizarDataHoraApi(t.data_hora_inicio),
+      data_hora_fim: normalizarDataHoraApi(t.data_hora_fim),
+    }))
+  } catch (e) {
+    console.error('Erro no dashboard/init, carregando individualmente:', e)
+    // Fallback: carrega individualmente se BFF falhar
+    const hoje = new Date()
+    const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
+    const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
+    await Promise.all([
+      fetchAgendamentos({ fromDate: semanaInicio, toDate: semanaFim }),
+      fetchReferencias(),
+      fetchTarefas(),
+    ])
+  } finally {
+    loading.value = false
+  }
 
   // ── Estágios seguintes: hidratação progressiva em segundo plano ─────────────
-  // Cada etapa amplia o intervalo já carregado (merge), em sequência para não
-  // sobrecarregar a CPU pequena do plano free. Navegar para fora do intervalo
-  // já dispara onDatesSet (busca sob demanda), então nada de histórico se perde.
+  // Janela máxima por chamada: 62 dias (respeitando o limite do backend).
   setTimeout(async () => {
-    // Referências e listas auxiliares (payloads pequenos) — necessárias para
-    // montar/editar agendamentos e o dropdown de clientes.
-    fetchReferencias()
-    fetchTarefas()
     fetchClientes()
-
-    // Amplia a janela de agendamentos em degraus: vizinhança imediata primeiro
-    // (navegação prev/next instantânea), depois o histórico mais amplo.
+    fetchFeriados()
     await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 1, mesesFuturos: 1 })
-    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 3, mesesFuturos: 2 })
-    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 12, mesesFuturos: 4 })
+    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 2, mesesFuturos: 2 })
   }, 0)
 })
 </script>
@@ -2675,5 +3123,36 @@ onMounted(async () => {
   padding: 8px 12px !important;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+/* ── Tooltip rico para hover nos agendamentos ── */
+.sgk-rich-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: #1e293b;
+  color: #f1f5f9;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  max-width: 280px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: sgk-tooltip-in 0.12s ease;
+}
+.sgk-rich-tooltip span:first-child {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 2px;
+}
+@keyframes sgk-tooltip-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 </style>

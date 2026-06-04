@@ -11,6 +11,7 @@ from db.models import Usuario
 from schemas.usuarios import (
     AlterarSenhaAdmin,
     AlterarSenhaProprio,
+    TokenFullResponse,
     TokenResponse,
     UsuarioCreate,
     UsuarioResponse,
@@ -38,6 +39,33 @@ def login(
         )
     token = create_access_token({"sub": usuario.username, "role": usuario.role.value})
     return TokenResponse(access_token=token)
+
+
+@router.post(
+    "/login-full",
+    response_model=TokenFullResponse,
+    summary="Autenticar e obter JWT + dados do usuário em um único round-trip",
+)
+def login_full(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Equivalente a POST /login seguido de GET /me, mas em uma única chamada.
+    Elimina o round-trip extra de ~1.9s que ocorre quando o frontend busca
+    /me separadamente após o login."""
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.username == form_data.username, Usuario.ativo == True)
+        .first()
+    )
+    if not usuario or not verify_password(form_data.password, usuario.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário ou senha incorretos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token({"sub": usuario.username, "role": usuario.role.value})
+    return TokenFullResponse(access_token=token, user=usuario)
 
 
 @router.post(

@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -64,6 +65,9 @@ def criar_agendamento(
     return agendamento_service.criar_agendamento(db, payload, criado_por_id=current_user.id)
 
 
+MAX_JANELA_DIAS = 62  # ~2 meses; evita queries de 15 meses que causaram 5.1s de wait
+
+
 @router.get("/", response_model=list[AgendamentoResponse], summary="Listar agendamentos")
 def listar_agendamentos(
     db: Annotated[Session, Depends(get_db)],
@@ -80,6 +84,13 @@ def listar_agendamentos(
         query = query.filter(Agendamento.cliente_id == cliente_id)
     if status_filtro:
         query = query.filter(Agendamento.status == status_filtro)
+
+    # Limitar a janela de datas para evitar queries gigantes (ex: 15 meses → 5.1s wait).
+    # Quando cliente_id está presente (histórico do cliente) não aplicamos o limite.
+    if not cliente_id and data_inicio and data_fim:
+        delta = (data_fim - data_inicio).days
+        if delta > MAX_JANELA_DIAS:
+            data_fim = data_inicio + timedelta(days=MAX_JANELA_DIAS)
 
     # Filtro de intervalo de datas via EXISTS — não cria join que duplica linhas.
     # data_inicio/data_fim chegam como `date`; convertemos para limites de dia

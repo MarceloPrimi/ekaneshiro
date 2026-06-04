@@ -70,6 +70,13 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class TokenFullResponse(BaseModel):
+    """Retorna token + dados do usuário em um único round-trip (elimina /me sequencial)."""
+    access_token: str
+    token_type: str = "bearer"
+    user: UsuarioResponse
+
+
 class TokenData(BaseModel):
     sub: str          # username do usuário
     role: RoleEnum

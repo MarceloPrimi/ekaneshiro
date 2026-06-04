@@ -26,9 +26,17 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) return '/login'
+  if (to.meta.requiresAuth && auth.isAuthenticated && !auth.user) {
+    try {
+      await auth.fetchMe()
+    } catch {
+      auth.logout()
+      return '/login'
+    }
+  }
   if (to.meta.guest && auth.isAuthenticated) return '/agendamentos'
   if (to.meta.adminOnly && !auth.isAdmin) return '/agendamentos'
 })

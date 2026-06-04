@@ -37,3 +37,6 @@ extracao dados/
 seed.py
 test.db
 resource/
+
+tests/
+test/

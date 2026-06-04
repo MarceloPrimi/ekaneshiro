@@ -13,12 +13,14 @@ export const useAuthStore = defineStore('auth', () => {
     const params = new URLSearchParams()
     params.append('username', username)
     params.append('password', senha)
-    const { data } = await api.post('/usuarios/login', params, {
+    // /login-full retorna token + dados do usuário em 1 round-trip (elimina /me sequencial)
+    const { data } = await api.post('/usuarios/login-full', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
     token.value = data.access_token
     localStorage.setItem('sgk_token', data.access_token)
-    await fetchMe()
+    user.value = data.user
+    localStorage.setItem('sgk_user', JSON.stringify(data.user))
   }
 
   async function fetchMe() {

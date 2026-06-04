@@ -331,6 +331,21 @@ class Produto(Base):
 
 
 # ---------------------------------------------------------------------------
+# Feriados / Dias bloqueados
+# ---------------------------------------------------------------------------
+
+class Feriado(Base):
+    __tablename__ = "feriados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    data = Column(String(10), nullable=False, unique=True, index=True)  # "YYYY-MM-DD"
+    nome = Column(String(200), nullable=False)
+    bloquear_agenda = Column(Boolean, default=False, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
+
+# ---------------------------------------------------------------------------
 # Tarefas Internas (agenda pessoal da recepção, sem vínculo com cliente)
 # ---------------------------------------------------------------------------
 
