@@ -7,9 +7,10 @@ compartilhar conexões HTTP com o mesmo host.
 Ganho estimado: -2 a -3 segundos no tempo de carga inicial.
 """
 from datetime import date, datetime, time, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from api.dependencias import get_current_user
@@ -20,6 +21,7 @@ from db.models import (
     Profissional,
     ProfissionalSecao,
     ProfissionalServico,
+    RoleEnum,
     Servico,
     TarefaInterna,
     Usuario,
@@ -31,6 +33,8 @@ from schemas.tarefas import TarefaResponse
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
+# Carrega todos os relacionamentos necessários para AgendamentoResponse.
+# Inclui 'categoria' para evitar lazy-load que pode causar erro fora do contexto.
 _EAGER_AGENDAMENTO = [
     joinedload(Agendamento.cliente),
     selectinload(Agendamento.itens).options(
@@ -38,6 +42,7 @@ _EAGER_AGENDAMENTO = [
         joinedload(ItemAgendamento.profissional),
     ),
     joinedload(Agendamento.pagamento),
+    joinedload(Agendamento.categoria),
 ]
 
 _EAGER_PROFISSIONAL = [
@@ -46,19 +51,34 @@ _EAGER_PROFISSIONAL = [
 ]
 
 
-@router.get("/init", summary="Carga inicial do calendário em uma única chamada")
+class DashboardInitResponse(BaseModel):
+    """Resposta tipada garante serialização correta pelo FastAPI."""
+    model_config = {"from_attributes": True}
+
+    servicos: list[ServicoResponse]
+    profissionais: list[Any]  # ProfissionalComServicosResponse (construído manualmente)
+    agendamentos: list[AgendamentoResponse]
+    tarefas: list[TarefaResponse]
+    janela_inicio: str   # YYYY-MM-DD — informar o frontend qual janela foi retornada
+    janela_fim: str
+
+
+@router.get(
+    "/init",
+    summary="Carga inicial do calendário em uma única chamada",
+)
 def dashboard_init(
     current_user: Annotated[Usuario, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
     """Agrega servicos + profissionais + agendamentos da semana + tarefas em 1 request.
 
-    A janela de agendamentos retornada aqui é a semana atual ±10 dias (mínimo para
-    pintar o calendário inicial). O frontend amplia progressivamente em background.
+    Janela de agendamentos: semana atual (hoje-7 a hoje+14 = ~3 semanas).
+    O frontend expande sob demanda via onDatesSet (2 semanas por navegação).
     """
     hoje = date.today()
-    inicio = datetime.combine(hoje - timedelta(days=10), time.min)
-    fim = datetime.combine(hoje + timedelta(days=10), time.max)
+    inicio = datetime.combine(hoje - timedelta(days=7), time.min)
+    fim = datetime.combine(hoje + timedelta(days=14), time.max)
 
     servicos = (
         db.query(Servico)
@@ -90,8 +110,6 @@ def dashboard_init(
         .order_by(Agendamento.criado_em.desc())
     )
 
-    # Profissional só vê os próprios agendamentos
-    from db.models import RoleEnum
     if current_user.role == RoleEnum.profissional:
         if current_user.profissional:
             agendamentos_query = agendamentos_query.filter(
@@ -106,8 +124,10 @@ def dashboard_init(
 
     agendamentos = agendamentos_query.all()
 
+    # Eager-load responsavel para evitar N+1 / lazy-load fora de sessão
     tarefas = (
         db.query(TarefaInterna)
+        .options(joinedload(TarefaInterna.responsavel))
         .order_by(TarefaInterna.data_hora_inicio)
         .all()
     )
@@ -115,11 +135,13 @@ def dashboard_init(
     return {
         "servicos": [ServicoResponse.model_validate(s) for s in servicos],
         "profissionais": [
-            ProfissionalComServicosResponse.from_orm_with_servicos(p)
+            ProfissionalComServicosResponse.from_orm_with_servicos(p).model_dump()
             for p in profissionais
         ],
-        "agendamentos": [AgendamentoResponse.model_validate(ag) for ag in agendamentos],
-        "tarefas": [TarefaResponse.model_validate(t) for t in tarefas],
+        "agendamentos": [AgendamentoResponse.model_validate(ag).model_dump() for ag in agendamentos],
+        "tarefas": [TarefaResponse.model_validate(t).model_dump() for t in tarefas],
+        "janela_inicio": str(hoje - timedelta(days=7)),
+        "janela_fim": str(hoje + timedelta(days=14)),
     }
 
 

@@ -1514,19 +1514,42 @@ function navegarParaHoje() {
   if (api) api.today()
 }
 
-// Sincroniza os selects quando o usuário navega com prev/next do FullCalendar
+const DUAS_SEMANAS_MS = 14 * 24 * 60 * 60 * 1000
+
+// Sincroniza os selects quando o usuário navega com prev/next do FullCalendar.
+// Carrega 2 semanas por vez — evita payloads grandes e mantém a navegação fluida.
 function onDatesSet(info) {
   const viewStart = new Date(info.start)
   filtroAno.value = viewStart.getFullYear()
   filtroMes.value = viewStart.getMonth()
 
   if (fetchingRange.value || !loadedFrom.value || !loadedTo.value) return
+
   const viewEnd = new Date(info.end)
-  if (viewStart < loadedFrom.value || viewEnd > loadedTo.value) {
-    fetchingRange.value = true
-    fetchAgendamentos({ silent: true, merge: true, fromDate: viewStart, toDate: viewEnd })
-      .finally(() => { fetchingRange.value = false })
+  const precisaAntes = viewStart < loadedFrom.value
+  const precisaDepois = viewEnd > loadedTo.value
+
+  if (!precisaAntes && !precisaDepois) return
+
+  fetchingRange.value = true
+
+  let fetchStart, fetchEnd
+  if (precisaAntes) {
+    // Usuário navegou para trás: carrega 2 semanas antes do início carregado
+    fetchEnd = new Date(loadedFrom.value)
+    fetchStart = new Date(fetchEnd.getTime() - DUAS_SEMANAS_MS)
+    // Garante que o início da view esteja incluído
+    if (viewStart < fetchStart) fetchStart = viewStart
+  } else {
+    // Usuário navegou para frente: carrega 2 semanas após o fim carregado
+    fetchStart = new Date(loadedTo.value)
+    fetchEnd = new Date(fetchStart.getTime() + DUAS_SEMANAS_MS)
+    // Garante que o fim da view esteja incluído
+    if (viewEnd > fetchEnd) fetchEnd = viewEnd
   }
+
+  fetchAgendamentos({ silent: true, merge: true, fromDate: fetchStart, toDate: fetchEnd })
+    .finally(() => { fetchingRange.value = false })
 }
 
 // ─── FullCalendar ──────────────────────────────────────────────────────────
@@ -2019,6 +2042,8 @@ function rruleToCount(rrule) {
 }
 
 function abrirModalNovo(dt = '', profId = null) {
+  // Garante que clientes esteja carregado antes de abrir o modal
+  if (!clientes.value.length) fetchClientes()
   modalMode.value = 'create'
   const item = emptyItem(dt)
   if (profId) item.profissional_id = profId
@@ -2914,20 +2939,25 @@ async function fetchReferencias() {
 onMounted(async () => {
   carregarCoresFavoritas()
 
-  // ── Estágio 1: /dashboard/init — 1 request carrega semana atual + referências ──
-  // Substitui 6 requests separadas (servicos, profissionais, agendamentos,
-  // tarefas) por uma única, eliminando o blocked/queued time do browser.
+  // ── Estágio 1: /dashboard/init — 1 request pinta a semana atual ────────────
+  // Janela: hoje-7 a hoje+14 (3 semanas). Substitui 6 requests separadas.
+  // Navegar além dessa janela dispara onDatesSet → carrega 2 semanas por vez.
   try {
     loading.value = true
     const { data: init } = await api.get('/dashboard/init')
 
-    servicos.value = init.servicos.filter(sv => sv.ativo !== false)
-    profissionais.value = init.profissionais
+    servicos.value = (init.servicos || []).filter(sv => sv.ativo !== false)
+    profissionais.value = init.profissionais || []
 
-    const hoje = new Date()
-    const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
-    const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
-    const mapped = (init.agendamentos || []).map(ag => ({
+    // Usa a janela informada pelo backend (evita hardcode que pode divergir)
+    const janelaDe = init.janela_inicio
+      ? new Date(init.janela_inicio + 'T00:00:00')
+      : new Date(Date.now() - 7 * 86400000)
+    const janelaAte = init.janela_fim
+      ? new Date(init.janela_fim + 'T23:59:59')
+      : new Date(Date.now() + 14 * 86400000)
+
+    agendamentos.value = (init.agendamentos || []).map(ag => ({
       ...ag,
       itens: (ag.itens || []).map(item => ({
         ...item,
@@ -2935,9 +2965,8 @@ onMounted(async () => {
         data_hora_fim: normalizarDataHoraApi(item.data_hora_fim),
       })),
     }))
-    agendamentos.value = mapped
-    loadedFrom.value = semanaInicio
-    loadedTo.value = semanaFim
+    loadedFrom.value = janelaDe
+    loadedTo.value = janelaAte
 
     tarefas.value = (init.tarefas || []).map(t => ({
       ...t,
@@ -2945,13 +2974,13 @@ onMounted(async () => {
       data_hora_fim: normalizarDataHoraApi(t.data_hora_fim),
     }))
   } catch (e) {
-    console.error('Erro no dashboard/init, carregando individualmente:', e)
     // Fallback: carrega individualmente se BFF falhar
-    const hoje = new Date()
-    const semanaInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 10)
-    const semanaFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10)
+    console.error('dashboard/init falhou, usando fallback:', e)
+    const agora = new Date()
+    const fb_inicio = new Date(agora.getTime() - 7 * 86400000)
+    const fb_fim = new Date(agora.getTime() + 14 * 86400000)
     await Promise.all([
-      fetchAgendamentos({ fromDate: semanaInicio, toDate: semanaFim }),
+      fetchAgendamentos({ fromDate: fb_inicio, toDate: fb_fim }),
       fetchReferencias(),
       fetchTarefas(),
     ])
@@ -2959,14 +2988,11 @@ onMounted(async () => {
     loading.value = false
   }
 
-  // ── Estágios seguintes: hidratação progressiva em segundo plano ─────────────
-  // Janela máxima por chamada: 62 dias (respeitando o limite do backend).
-  setTimeout(async () => {
-    fetchClientes()
-    fetchFeriados()
-    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 1, mesesFuturos: 1 })
-    await fetchAgendamentos({ silent: true, merge: true, mesesPassados: 2, mesesFuturos: 2 })
-  }, 0)
+  // ── Background: dados auxiliares e feriados (não bloqueiam a tela) ─────────
+  // clientes (57 KB) carregado com delay para não competir com o render inicial.
+  // onDatesSet cuida de expandir agendamentos 2 semanas por vez ao navegar.
+  setTimeout(() => { fetchFeriados() }, 200)
+  setTimeout(() => { fetchClientes() }, 1500)
 })
 </script>
 
