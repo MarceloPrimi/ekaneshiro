@@ -126,17 +126,6 @@
             @click="mostrarTarefas = !mostrarTarefas"
           >Tarefas no calendário</button>
 
-          <button
-            v-if="isRecepcionistaOuAdmin"
-            class="h-11 px-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
-            title="Gerenciar feriados e dias bloqueados"
-            @click="abrirModalFeriado()"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path stroke-linecap="round" d="M9 16l2 2 4-4"/></svg>
-            Feriados
-            <span v-if="feriados.filter(f=>f.bloquear_agenda).length" class="bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ feriados.filter(f=>f.bloquear_agenda).length }}</span>
-          </button>
-
           <template v-if="isRecepcionistaOuAdmin">
             <button
               class="h-11 px-3 border rounded-lg text-sm"
@@ -180,6 +169,17 @@
               <ClipboardList class="w-4 h-4 flex-shrink-0" />
               Nova Tarefa
             </button>
+            <template v-if="isRecepcionistaOuAdmin">
+              <div class="my-1 border-t border-gray-100"></div>
+              <button
+                class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                @click="abrirModalFeriado(); showNovoMenu = false"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path stroke-linecap="round" d="M9 16l2 2 4-4"/></svg>
+                Feriado / Dia Bloqueado
+                <span v-if="feriados.filter(f=>f.bloquear_agenda).length" class="ml-auto bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ feriados.filter(f=>f.bloquear_agenda).length }}</span>
+              </button>
+            </template>
           </div>
         </div>
 
@@ -1657,18 +1657,22 @@ const calendarEventsTarefas = computed(() => {
     })
 })
 
-// Feriados como eventos de dia inteiro no calendário
+// Feriados como eventos de dia inteiro no calendário.
+// Feriados com bloqueio aparecem como blocos cinza pesados (como "dia fechado").
+// Feriados sem bloqueio aparecem como banner informativo amarelo sutil.
 const calendarEventsFeriados = computed(() =>
   feriados.value.map(f => ({
     id: `feriado-${f.id}`,
-    title: f.bloquear_agenda ? `🚫 ${f.nome}` : `🗓️ ${f.nome}`,
+    title: f.bloquear_agenda ? `🔒 ${f.nome}` : `📅 ${f.nome}`,
     start: f.data,
     allDay: true,
-    backgroundColor: f.bloquear_agenda ? '#fef2f2' : '#fefce8',
-    borderColor: f.bloquear_agenda ? '#ef4444' : '#f59e0b',
-    textColor: f.bloquear_agenda ? '#b91c1c' : '#92400e',
+    backgroundColor: f.bloquear_agenda ? '#d1d5db' : '#fef9c3',
+    borderColor:     f.bloquear_agenda ? '#9ca3af' : '#fcd34d',
+    textColor:       f.bloquear_agenda ? '#374151' : '#78350f',
     extendedProps: { feriado: f, tipo: 'feriado' },
     display: 'block',
+    // Garantir que feriados bloqueados apareçam com destaque acima dos agendamentos
+    classNames: f.bloquear_agenda ? ['sgk-feriado-bloqueado'] : ['sgk-feriado-info'],
   }))
 )
 
@@ -2681,12 +2685,17 @@ async function fetchAgendamentos(options = {}) {
     if (merge) {
       const incomingIds = new Set(mapped.map(a => a.id))
       agendamentos.value = [...agendamentos.value.filter(a => !incomingIds.has(a.id)), ...mapped]
+      // Expande o intervalo já carregado
+      if (!loadedFrom.value || inicio < loadedFrom.value) loadedFrom.value = inicio
+      if (!loadedTo.value || fim > loadedTo.value) loadedTo.value = fim
     } else {
       agendamentos.value = mapped
+      // Reset: apenas o intervalo efetivamente buscado está carregado.
+      // Crucial quando muda o filtro de profissional — sem reset, onDatesSet
+      // pensa que dados futuros estão carregados e não refaz a busca.
+      loadedFrom.value = inicio
+      loadedTo.value = fim
     }
-    // Expandir o intervalo já carregado
-    if (!loadedFrom.value || inicio < loadedFrom.value) loadedFrom.value = inicio
-    if (!loadedTo.value || fim > loadedTo.value) loadedTo.value = fim
   } catch (e) {
     console.error('Erro ao carregar agendamentos:', e)
   } finally {
@@ -2696,7 +2705,15 @@ async function fetchAgendamentos(options = {}) {
 
 // onDatesSet está definido acima no bloco "Filtro Anual / Navegação por mês"
 
-watch(filtroProfissional, () => fetchAgendamentos())
+watch(filtroProfissional, () => {
+  // Janela centrada em hoje (±31 dias = 62 dias total, dentro do cap do backend).
+  // Evita o bug em que a janela padrão (hoje-3m → hoje+4m) era truncada pelo
+  // backend para 'hoje-90 → hoje-28', excluindo completamente a semana atual.
+  const agora = new Date()
+  const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, agora.getDate())
+  const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, agora.getDate())
+  fetchAgendamentos({ fromDate: inicio, toDate: fim })
+})
 
 // ─── Clientes CRUD ─────────────────────────────────────────────────────────
 const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
@@ -3123,6 +3140,20 @@ onMounted(async () => {
   padding: 8px 12px !important;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+/* ── Feriados no calendário ── */
+.fc-wrapper .sgk-feriado-bloqueado {
+  opacity: 0.92 !important;
+  font-weight: 600 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.01em;
+  cursor: pointer !important;
+}
+.fc-wrapper .sgk-feriado-info {
+  opacity: 0.8 !important;
+  font-size: 0.7rem !important;
+  cursor: pointer !important;
 }
 
 /* ── Tooltip rico para hover nos agendamentos ── */

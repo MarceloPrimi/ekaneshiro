@@ -65,7 +65,32 @@ def criar_agendamento(
     return agendamento_service.criar_agendamento(db, payload, criado_por_id=current_user.id)
 
 
-MAX_JANELA_DIAS = 62  # ~2 meses; evita queries de 15 meses que causaram 5.1s de wait
+MAX_JANELA_DIAS = 93  # ~3 meses; evita queries de 15 meses mantendo uma janela útil centrada em hoje
+
+
+def _limitar_janela(data_inicio: date, data_fim: date) -> tuple[date, date]:
+    """Garante janela <= MAX_JANELA_DIAS.
+
+    Quando a janela pedida contém hoje, recentraliza em torno de hoje para que
+    os agendamentos atuais nunca fiquem fora do corte. Sem isso, uma janela de
+    '3 meses atrás → 4 meses à frente' seria truncada para
+    '3 meses atrás → 3 meses atrás + 93 dias', excluindo a semana atual.
+    """
+    if (data_fim - data_inicio).days <= MAX_JANELA_DIAS:
+        return data_inicio, data_fim
+    hoje = date.today()
+    if data_inicio <= hoje <= data_fim:
+        # Centraliza: metade antes, metade depois de hoje
+        meio = MAX_JANELA_DIAS // 2
+        novo_inicio = max(data_inicio, hoje - timedelta(days=meio))
+        novo_fim = novo_inicio + timedelta(days=MAX_JANELA_DIAS)
+        # Ajusta se novo_fim ultrapassar data_fim original
+        if novo_fim > data_fim:
+            novo_fim = data_fim
+            novo_inicio = max(data_inicio, novo_fim - timedelta(days=MAX_JANELA_DIAS))
+        return novo_inicio, novo_fim
+    # Janela não contém hoje: trunca a partir do início
+    return data_inicio, data_inicio + timedelta(days=MAX_JANELA_DIAS)
 
 
 @router.get("/", response_model=list[AgendamentoResponse], summary="Listar agendamentos")
@@ -86,11 +111,10 @@ def listar_agendamentos(
         query = query.filter(Agendamento.status == status_filtro)
 
     # Limitar a janela de datas para evitar queries gigantes (ex: 15 meses → 5.1s wait).
-    # Quando cliente_id está presente (histórico do cliente) não aplicamos o limite.
+    # Centraliza em torno de hoje quando a janela contém hoje — evita excluir a semana atual.
+    # Não aplica limite quando cliente_id está presente (histórico do cliente).
     if not cliente_id and data_inicio and data_fim:
-        delta = (data_fim - data_inicio).days
-        if delta > MAX_JANELA_DIAS:
-            data_fim = data_inicio + timedelta(days=MAX_JANELA_DIAS)
+        data_inicio, data_fim = _limitar_janela(data_inicio, data_fim)
 
     # Filtro de intervalo de datas via EXISTS — não cria join que duplica linhas.
     # data_inicio/data_fim chegam como `date`; convertemos para limites de dia
