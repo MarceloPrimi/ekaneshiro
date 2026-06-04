@@ -315,6 +315,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+defineOptions({ name: 'ServicosView' })
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 

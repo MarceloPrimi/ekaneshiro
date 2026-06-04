@@ -423,9 +423,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated } from 'vue'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
+
+defineOptions({ name: 'ProfissionaisView' })
 
 const { sucesso: toastSucesso } = useToast()
 import { useAuthStore } from '@/stores/auth'
@@ -557,11 +559,24 @@ async function fetchUsuariosProfissionais() {
   }
 }
 
+const lastFetchAt = ref(0)
+const STALE_MS = 5 * 60 * 1000
+
 onMounted(() => {
   fetchProfissionais()
   fetchServicos()
   fetchSecoes()
   fetchUsuariosProfissionais()
+  lastFetchAt.value = Date.now()
+})
+
+// Com KeepAlive: volta instantaneamente; refetch silencioso após 5 min.
+onActivated(() => {
+  if (!lastFetchAt.value) return
+  if (Date.now() - lastFetchAt.value > STALE_MS) {
+    fetchProfissionais()
+    lastFetchAt.value = Date.now()
+  }
 })
 
 function abrirModal() {

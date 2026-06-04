@@ -263,9 +263,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
+
+defineOptions({ name: 'PagamentosView' })
 
 const { sucesso: toastSucesso } = useToast()
 
@@ -424,5 +426,21 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 }
 
-onMounted(fetchAgendamentos)
+const lastFetchAt = ref(0)
+const STALE_MS = 5 * 60 * 1000
+
+onMounted(() => {
+  fetchAgendamentos()
+  lastFetchAt.value = Date.now()
+})
+
+// Com KeepAlive: volta para a aba instantaneamente; só refaz request se dados
+// estiverem velhos (> 5 min) — pagamentos mudam com frequência.
+onActivated(() => {
+  if (!lastFetchAt.value) return
+  if (Date.now() - lastFetchAt.value > STALE_MS) {
+    fetchAgendamentos()
+    lastFetchAt.value = Date.now()
+  }
+})
 </script>

@@ -310,6 +310,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+defineOptions({ name: 'ProdutosView' })
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 

@@ -178,9 +178,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-// Views mantidas em memória — trocar de aba e voltar é instantâneo.
-// Adicione aqui outras views pesadas se necessário.
-const KEEP_ALIVE_VIEWS = ['AgendamentosView']
+// Views mantidas em memória entre navegações — trocar de aba e voltar é instantâneo.
+// Pagamentos e Profissionais têm onActivated com staleness check de 5 min.
+// RelatoriosView e UsuariosView ficam de fora (dados devem ser sempre frescos / payload leve).
+const KEEP_ALIVE_VIEWS = ['AgendamentosView', 'PagamentosView', 'ProfissionaisView', 'ServicosView', 'ProdutosView']
 import {
   Calendar,
   CreditCard,
