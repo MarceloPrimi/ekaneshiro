@@ -91,7 +91,13 @@
       class="flex-1 overflow-auto p-4 sm:p-6 pb-20 lg:pb-6 transition-all duration-300 ease-in-out"
       :class="drawerOpen ? 'lg:ml-56' : 'lg:ml-14'"
     >
-      <RouterView />
+      <!-- KeepAlive mantém AgendamentosView em memória entre navegações,
+           evitando re-montar e re-buscar dados toda vez que o usuário troca de aba. -->
+      <RouterView v-slot="{ Component, route }">
+        <KeepAlive :include="KEEP_ALIVE_VIEWS">
+          <component :is="Component" :key="route.path" />
+        </KeepAlive>
+      </RouterView>
     </main>
 
     <!-- Modal: Minha Senha -->
@@ -171,6 +177,10 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+
+// Views mantidas em memória — trocar de aba e voltar é instantâneo.
+// Adicione aqui outras views pesadas se necessário.
+const KEEP_ALIVE_VIEWS = ['AgendamentosView']
 import {
   Calendar,
   CreditCard,

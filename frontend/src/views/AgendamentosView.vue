@@ -1163,7 +1163,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
+
+// Nome explícito necessário para que <KeepAlive include="AgendamentosView"> funcione.
+// defineOptions é uma macro do compilador Vue 3.3+ — não precisa de import.
+defineOptions({ name: 'AgendamentosView' })
 import { Calendar, ClipboardList, ChevronDown } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import FullCalendar from '@fullcalendar/vue3'
@@ -2936,6 +2940,10 @@ async function fetchReferencias() {
   } catch (e) { console.error('Erro ao carregar referências:', e) }
 }
 
+// Timestamp do último fetch completo — usado pelo onActivated para staleness check.
+const lastFetchAt = ref(0)
+const STALE_MS = 5 * 60 * 1000  // 5 minutos
+
 onMounted(async () => {
   carregarCoresFavoritas()
 
@@ -2986,6 +2994,7 @@ onMounted(async () => {
     ])
   } finally {
     loading.value = false
+    lastFetchAt.value = Date.now()
   }
 
   // ── Background: dados auxiliares e feriados (não bloqueiam a tela) ─────────
@@ -2993,6 +3002,25 @@ onMounted(async () => {
   // onDatesSet cuida de expandir agendamentos 2 semanas por vez ao navegar.
   setTimeout(() => { fetchFeriados() }, 200)
   setTimeout(() => { fetchClientes() }, 1500)
+})
+
+// ── KeepAlive: onActivated dispara ao voltar para esta aba ─────────────────
+// Se os dados ainda estão frescos (< 5 min), mostra o cache instantaneamente.
+// Se estiverem velhos, faz um refresh silencioso da janela atual em background.
+onActivated(() => {
+  if (!lastFetchAt.value) return  // primeira vez já tratada pelo onMounted
+  const stale = Date.now() - lastFetchAt.value > STALE_MS
+  if (!stale) return  // dados frescos → exibe cache, nenhuma request
+
+  // Dados com mais de 5 min: refresh silencioso sem travar a tela
+  const cal = calendarRef.value?.getApi?.()
+  const viewDate = cal ? new Date(cal.getDate()) : new Date()
+  const refreshInicio = new Date(viewDate.getTime() - 7 * 86400000)
+  const refreshFim = new Date(viewDate.getTime() + 14 * 86400000)
+
+  fetchAgendamentos({ silent: true, merge: false, fromDate: refreshInicio, toDate: refreshFim })
+    .then(() => { lastFetchAt.value = Date.now() })
+  fetchFeriados()
 })
 </script>
 
