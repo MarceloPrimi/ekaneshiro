@@ -928,13 +928,29 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Telefone</label>
                 <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400 h-11">
-                  <select
-                    v-model="ddiCliente"
-                    class="bg-gray-50 text-sm text-gray-600 border-r border-gray-200 px-2 h-full focus:outline-none"
-                    style="min-width: 6rem; max-width: 7rem"
-                  >
-                    <option v-for="p in DDI_PAISES" :key="p.ddi" :value="p.ddi">{{ p.label }}</option>
-                  </select>
+                  <!-- Seletor de DDI: mostra flag+código quando fechado; flag+nome+código na lista -->
+                  <div class="relative h-full flex-shrink-0">
+                    <button type="button"
+                      @click="showDdiMenu = !showDdiMenu"
+                      @blur="setTimeout(() => { showDdiMenu = false }, 150)"
+                      class="h-full bg-gray-50 border-r border-gray-200 px-2 text-sm font-medium text-gray-700 flex items-center gap-1 focus:outline-none hover:bg-gray-100 transition-colors"
+                      style="min-width: 5.5rem"
+                    >
+                      <span class="text-base leading-none">{{ ddiInfo(ddiCliente).flag }}</span>
+                      <span class="font-mono">{{ ddiCliente }}</span>
+                      <svg class="w-3 h-3 text-gray-400 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <ul v-if="showDdiMenu" class="absolute top-full left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto" style="min-width:13rem">
+                      <li v-for="p in DDI_PAISES" :key="p.ddi"
+                        @mousedown.prevent="ddiCliente = p.ddi; showDdiMenu = false"
+                        :class="['flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors', ddiCliente === p.ddi ? 'bg-rose-50 text-rose-700 font-medium' : 'text-gray-700 hover:bg-gray-50']"
+                      >
+                        <span class="text-base w-6 text-center">{{ p.flag }}</span>
+                        <span class="flex-1">{{ p.nome }}</span>
+                        <span class="font-mono text-xs text-gray-400">{{ p.ddi }}</span>
+                      </li>
+                    </ul>
+                  </div>
                   <!--
                     type="tel" abre o teclado numérico no iOS/Android (com traços e parênteses).
                     inputmode="tel" reforça isso em browsers que ignoram o type.
@@ -1079,13 +1095,29 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
             <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-rose-400 h-11">
-              <select
-                v-model="ddiClienteRapido"
-                class="bg-gray-50 text-sm text-gray-600 border-r border-gray-200 px-2 h-full focus:outline-none"
-                style="min-width: 6rem; max-width: 7rem"
-              >
-                <option v-for="p in DDI_PAISES" :key="p.ddi" :value="p.ddi">{{ p.label }}</option>
-              </select>
+              <!-- Seletor de DDI (modal rápido) -->
+              <div class="relative h-full flex-shrink-0">
+                <button type="button"
+                  @click="showDdiMenuRapido = !showDdiMenuRapido"
+                  @blur="setTimeout(() => { showDdiMenuRapido = false }, 150)"
+                  class="h-full bg-gray-50 border-r border-gray-200 px-2 text-sm font-medium text-gray-700 flex items-center gap-1 focus:outline-none hover:bg-gray-100 transition-colors"
+                  style="min-width: 5.5rem"
+                >
+                  <span class="text-base leading-none">{{ ddiInfo(ddiClienteRapido).flag }}</span>
+                  <span class="font-mono">{{ ddiClienteRapido }}</span>
+                  <svg class="w-3 h-3 text-gray-400 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <ul v-if="showDdiMenuRapido" class="absolute top-full left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto" style="min-width:13rem">
+                  <li v-for="p in DDI_PAISES" :key="p.ddi"
+                    @mousedown.prevent="ddiClienteRapido = p.ddi; showDdiMenuRapido = false"
+                    :class="['flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors', ddiClienteRapido === p.ddi ? 'bg-rose-50 text-rose-700 font-medium' : 'text-gray-700 hover:bg-gray-50']"
+                  >
+                    <span class="text-base w-6 text-center">{{ p.flag }}</span>
+                    <span class="flex-1">{{ p.nome }}</span>
+                    <span class="font-mono text-xs text-gray-400">{{ p.ddi }}</span>
+                  </li>
+                </ul>
+              </div>
               <input v-model="formClienteRapido.telefone" type="tel" inputmode="tel" class="flex-1 px-3 py-2 text-sm focus:outline-none h-full" placeholder="(11) 99999-9999" />
             </div>
           </div>
@@ -1316,23 +1348,28 @@ const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinami
 
 // DDI: separamos DDI e número para exibição; na persistência armazenamos no campo telefone
 const DDI_PAISES = [
-  { ddi: '+55', label: '🇧🇷 +55 Brasil' },
-  { ddi: '+1',  label: '🇺🇸 +1 EUA / Canadá' },
-  { ddi: '+54', label: '🇦🇷 +54 Argentina' },
-  { ddi: '+56', label: '🇨🇱 +56 Chile' },
-  { ddi: '+51', label: '🇵🇪 +51 Peru' },
-  { ddi: '+57', label: '🇨🇴 +57 Colômbia' },
-  { ddi: '+595', label: '🇵🇾 +595 Paraguai' },
-  { ddi: '+598', label: '🇺🇾 +598 Uruguai' },
-  { ddi: '+34', label: '🇪🇸 +34 Espanha' },
-  { ddi: '+351', label: '🇵🇹 +351 Portugal' },
-  { ddi: '+44', label: '🇬🇧 +44 Reino Unido' },
-  { ddi: '+49', label: '🇩🇪 +49 Alemanha' },
-  { ddi: '+39', label: '🇮🇹 +39 Itália' },
-  { ddi: '+81', label: '🇯🇵 +81 Japão' },
+  { ddi: '+55',  flag: '🇧🇷', nome: 'Brasil' },
+  { ddi: '+1',   flag: '🇺🇸', nome: 'EUA / Canadá' },
+  { ddi: '+54',  flag: '🇦🇷', nome: 'Argentina' },
+  { ddi: '+56',  flag: '🇨🇱', nome: 'Chile' },
+  { ddi: '+51',  flag: '🇵🇪', nome: 'Peru' },
+  { ddi: '+57',  flag: '🇨🇴', nome: 'Colômbia' },
+  { ddi: '+595', flag: '🇵🇾', nome: 'Paraguai' },
+  { ddi: '+598', flag: '🇺🇾', nome: 'Uruguai' },
+  { ddi: '+34',  flag: '🇪🇸', nome: 'Espanha' },
+  { ddi: '+351', flag: '🇵🇹', nome: 'Portugal' },
+  { ddi: '+44',  flag: '🇬🇧', nome: 'Reino Unido' },
+  { ddi: '+49',  flag: '🇩🇪', nome: 'Alemanha' },
+  { ddi: '+39',  flag: '🇮🇹', nome: 'Itália' },
+  { ddi: '+81',  flag: '🇯🇵', nome: 'Japão' },
 ]
+function ddiInfo(ddi) {
+  return DDI_PAISES.find(p => p.ddi === ddi) ?? { flag: '🌐', nome: '', ddi }
+}
 const ddiCliente = ref('+55')
 const ddiClienteRapido = ref('+55')
+const showDdiMenu = ref(false)
+const showDdiMenuRapido = ref(false)
 
 /** Extrai DDI e número de um telefone armazenado. */
 function parseTelefone(tel) {
