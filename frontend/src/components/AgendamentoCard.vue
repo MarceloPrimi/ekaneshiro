@@ -42,12 +42,13 @@ const ETIQUETA_MAP: Record<string, { emoji: string; label: string }> = {
   primeira_vez: { emoji: '✨', label: 'Primeira Vez' },
 }
 
-// Cores por status — bandeirinha no canto
+// Cores por status — bandeirinha no canto (paleta escura)
 const STATUS_FLAG: Record<string, { color: string; label: string }> = {
-  pendente:   { color: '#f59e0b', label: 'Pendente' },
-  confirmado: { color: '#3b82f6', label: 'Confirmado' },
-  concluido:  { color: '#22c55e', label: 'Concluído' },
-  cancelado:  { color: '#ef4444', label: 'Cancelado' },
+  pendente:        { color: '#4b5563', label: 'Pendente' },
+  confirmado:      { color: '#15803d', label: 'Confirmado' },
+  concluido:       { color: '#1d4ed8', label: 'Concluído' },
+  pre_agendamento: { color: '#b91c1c', label: 'Pré-agendamento' },
+  cancelado:       { color: '#b91c1c', label: 'Cancelado' },
 }
 const statusFlag = STATUS_FLAG[props.agendamento.status] ?? { color: '#9ca3af', label: props.agendamento.status }
 

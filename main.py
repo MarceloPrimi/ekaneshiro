@@ -12,6 +12,7 @@ from api.rotas_tarefas import router as tarefas_router
 from api.rotas_secoes import router as secoes_router
 from api.rotas_dashboard import router as dashboard_router
 from api.rotas_feriados import router as feriados_router
+from api.rotas_preferencias import router as preferencias_router
 
 from core.config import settings
 
@@ -46,6 +47,7 @@ app.include_router(tarefas_router)
 app.include_router(secoes_router)
 app.include_router(dashboard_router)
 app.include_router(feriados_router)
+app.include_router(preferencias_router)
 
 
 @app.get("/health", tags=["Status"])

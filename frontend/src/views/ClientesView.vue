@@ -269,10 +269,11 @@ function diaSemana(dateStr) {
 }
 
 const STATUS_DOT = {
-  pendente:   'bg-yellow-400',
-  confirmado: 'bg-blue-400',
-  concluido:  'bg-green-400',
-  cancelado:  'bg-red-400',
+  pendente:        'bg-gray-600',
+  confirmado:      'bg-green-700',
+  concluido:       'bg-blue-700',
+  pre_agendamento: 'bg-red-700',
+  cancelado:       'bg-red-700',
 }
 
 function statusDot(status) {

@@ -40,6 +40,8 @@ class StatusAgendamentoEnum(str, enum.Enum):
     pendente = "pendente"
     confirmado = "confirmado"
     concluido = "concluido"
+    pre_agendamento = "pre_agendamento"
+    # Mantido para compatibilidade com dados legados; não usar em novo código.
     cancelado = "cancelado"
 
 
@@ -365,3 +367,20 @@ class TarefaInterna(Base):
 
     responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
     criado_por = relationship("Usuario", foreign_keys=[criado_por_id])
+
+
+# ---------------------------------------------------------------------------
+# Preferências do usuário (presets de cores para agendamentos)
+# ---------------------------------------------------------------------------
+
+class PreferenciasUsuario(Base):
+    __tablename__ = "preferencias_usuario"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True, nullable=False, index=True)
+    # JSON: lista de até 20 strings hex (ex: ["#59C3B9", "#f59e0b", ...])
+    preset_cores = Column(JSON, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    usuario = relationship("Usuario", backref="preferencias")

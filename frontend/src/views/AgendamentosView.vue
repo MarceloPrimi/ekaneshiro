@@ -82,15 +82,6 @@
 
             <template v-if="isRecepcionistaOuAdmin">
               <div class="h-px bg-gray-100 mx-3 my-1"></div>
-              <button
-                class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
-                :class="colunaPorProfissional ? 'text-rose-700 bg-rose-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
-                @click="toggleColunaPorProfissional(); showMobileMenu = false"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" :class="colunaPorProfissional ? 'text-rose-500' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
-                <span class="flex-1">Visão Diária</span>
-                <svg v-if="colunaPorProfissional" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-rose-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </button>
               <div class="px-3 pb-2.5 pt-1">
                 <select
                   v-model="filtroProfissional"
@@ -127,11 +118,6 @@
           >Tarefas no calendário</button>
 
           <template v-if="isRecepcionistaOuAdmin">
-            <button
-              class="h-11 px-3 border rounded-lg text-sm"
-              :class="colunaPorProfissional ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
-              @click="toggleColunaPorProfissional()"
-            >Visão Diária</button>
             <select
               v-model="filtroProfissional"
               class="h-11 min-w-[220px] border border-gray-200 text-gray-600 text-sm px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300"
@@ -243,7 +229,7 @@
         componente antigo e criar um novo, aplicando a initialView correta.
         Isso é mais limpo do que manipular a API imperativa do FullCalendar.
       -->
-      <!-- Filtro anual: seletor de mês/ano para navegação rápida sem clicar prev/next várias vezes -->
+      <!-- Barra de navegação: seletor de mês/ano + botão Visão Diária -->
       <div class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
         <label class="text-xs text-gray-500 font-medium whitespace-nowrap">Ir para:</label>
         <select
@@ -264,6 +250,18 @@
           class="text-xs px-2 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
           @click="navegarParaHoje"
         >Hoje</button>
+        <!-- Visão Diária — aqui junto com os controles de navegação do calendário -->
+        <div class="ml-auto">
+          <button
+            class="text-xs px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5"
+            :class="colunaPorProfissional ? 'border-rose-300 bg-rose-100 text-rose-700 font-semibold' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-100'"
+            @click="toggleColunaPorProfissional()"
+            title="Alternar Visão Diária por profissional"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+            Visão Diária
+          </button>
+        </div>
       </div>
 
       <FullCalendar
@@ -278,12 +276,22 @@
     <!-- Visão diária por colunas (sem plugin premium) -->
     <div v-else class="flex-1 bg-white border border-gray-200 rounded-xl overflow-auto">
       <!-- Seletor de data para a visão em colunas -->
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
         <!-- Touch targets mínimos: w-11 h-11 = 44x44px (Apple HIG / Material Design) -->
         <button class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg text-xl transition-colors" @click="colunaDia = prevDay(colunaDia)" aria-label="Dia anterior">‹</button>
         <input v-model="colunaDia" type="date" class="border border-gray-200 rounded-lg px-3 py-2 h-11 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" />
         <button class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg text-xl transition-colors" @click="colunaDia = nextDay(colunaDia)" aria-label="Próximo dia">›</button>
         <span class="text-sm text-gray-500 ml-1">{{ formatDayLabel(colunaDia) }}</span>
+        <div class="ml-auto">
+          <button
+            class="text-xs px-2.5 py-1.5 rounded-lg border border-rose-300 bg-rose-100 text-rose-700 font-semibold transition-colors flex items-center gap-1.5 hover:bg-rose-200"
+            @click="toggleColunaPorProfissional()"
+            title="Voltar para o calendário"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+            Visão Diária
+          </button>
+        </div>
       </div>
       <!-- Grid de colunas -->
       <div class="overflow-x-auto">
@@ -671,7 +679,7 @@
               class="mb-2 bg-white rounded-xl px-3 py-2.5 border border-gray-100"
             >
               <div class="flex items-start gap-2">
-                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-yellow-400': item.agStatus==='pendente', 'bg-blue-400': item.agStatus==='confirmado', 'bg-green-400': item.agStatus==='concluido', 'bg-red-400': item.agStatus==='cancelado' }"></span>
+                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
                 <div class="min-w-0">
                   <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
                   <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
@@ -692,7 +700,7 @@
               class="mb-2 bg-indigo-50/60 rounded-xl px-3 py-2.5 border border-indigo-100"
             >
               <div class="flex items-start gap-2">
-                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-yellow-400': item.agStatus==='pendente', 'bg-blue-400': item.agStatus==='confirmado', 'bg-green-400': item.agStatus==='concluido' }"></span>
+                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido' }"></span>
                 <div class="min-w-0">
                   <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
                   <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
@@ -898,7 +906,7 @@
         <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <h3 class="text-lg font-bold text-gray-800">{{ formCliente.nome || 'Novo Cliente' }}</h3>
-            <p v-if="clienteSelecionadoPainel?.id" class="text-xs text-gray-400 mt-0.5">{{ historicoCliente.length }} visita{{ historicoCliente.length !== 1 ? 's' : '' }}</p>
+            <p v-if="clienteSelecionadoPainel?.id" class="text-xs text-gray-400 mt-0.5">{{ historicoClienteItens.length }} visita{{ historicoClienteItens.length !== 1 ? 's' : '' }} · {{ proximosClienteItens.length }} próximo{{ proximosClienteItens.length !== 1 ? 's' : '' }}</p>
           </div>
           <button @click="clienteDrawer = false" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -992,16 +1000,40 @@
               </div>
             </form>
           </div>
-          <!-- Direita: histórico -->
+          <!-- Direita: próximos agendamentos + histórico -->
           <div :class="['flex-1 overflow-y-auto p-5', isMobile && clienteTab !== 'historico' ? 'hidden' : '']">
-            <h4 class="text-sm font-semibold text-gray-700 mb-4">Visitas anteriores</h4>
+            <!-- Próximos Agendamentos (exibido diretamente no painel do cliente) -->
+            <div class="mb-6">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                Próximos Agendamentos
+                <span v-if="!loadingHistoricoCliente" class="text-xs font-normal text-gray-400">({{ proximosClienteItens.length }})</span>
+              </h4>
+              <div v-if="!clienteSelecionadoPainel?.id" class="text-sm text-gray-400 italic">Salve o cliente para ver os agendamentos.</div>
+              <div v-else-if="loadingHistoricoCliente" class="text-sm text-gray-400">Carregando...</div>
+              <div v-else-if="proximosClienteItens.length === 0" class="text-sm text-gray-400 italic">Nenhum próximo agendamento.</div>
+              <div v-for="(item, idx) in proximosClienteItens" :key="'pcp-' + idx" class="mb-2.5 bg-indigo-50/70 rounded-xl p-3 border border-indigo-100">
+                <div class="flex items-start gap-2.5">
+                  <span class="mt-1.5 flex-shrink-0 w-2.5 h-2.5 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido' }"></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ item.profissional?.nome }}</p>
+                    <p class="text-xs text-indigo-600 mt-0.5 font-medium">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+                  </div>
+                  <span :class="statusBadgeClass(item.agStatus)" class="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0">{{ STATUS_LABELS[item.agStatus] ?? item.agStatus }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-gray-100 pt-5">
+              <h4 class="text-sm font-semibold text-gray-700 mb-4">Visitas anteriores</h4>
+            </div>
             <div v-if="!clienteSelecionadoPainel?.id" class="text-sm text-gray-400 italic">Salve o cliente para ver o histórico.</div>
             <div v-else-if="loadingHistoricoCliente" class="text-sm text-gray-400">Carregando...</div>
             <div v-else-if="historicoClienteItens.length === 0" class="text-sm text-gray-400 italic">Nenhuma visita.</div>
             <div v-for="(item, idx) in historicoClienteItens" :key="idx" class="mb-3 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-2.5 min-w-0">
-                  <span class="mt-1.5 flex-shrink-0 w-2.5 h-2.5 rounded-full" :class="{ 'bg-yellow-400': item.agStatus==='pendente', 'bg-blue-400': item.agStatus==='confirmado', 'bg-green-400': item.agStatus==='concluido', 'bg-red-400': item.agStatus==='cancelado' }"></span>
+                  <span class="mt-1.5 flex-shrink-0 w-2.5 h-2.5 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
                     <p class="text-xs text-gray-500 mt-0.5">Colaborador: {{ item.profissional?.nome }}</p>
@@ -1296,10 +1328,11 @@ const detalheCorSelecionada = ref('#59C3B9')
 const coresFavoritas = ref([])
 
 const STATUS_LABELS = {
-  pendente: 'Pendente',
-  confirmado: 'Confirmado',
-  concluido: 'Concluído',
-  cancelado: 'Cancelado',
+  pendente:        'Pendente',
+  confirmado:      'Confirmado',
+  concluido:       'Concluído',
+  pre_agendamento: 'Pré-agendamento',
+  cancelado:       'Cancelado',
 }
 
 // Pagamento rápido a partir do agendamento
@@ -1891,10 +1924,11 @@ function renderEventContent(arg) {
     : 60
 
   const STATUS_FLAG_COLOR = {
-    pendente:   '#f59e0b',
-    confirmado: '#3b82f6',
-    concluido:  '#22c55e',
-    cancelado:  '#ef4444',
+    pendente:        '#4b5563',
+    confirmado:      '#15803d',
+    concluido:       '#1d4ed8',
+    pre_agendamento: '#b91c1c',
+    cancelado:       '#b91c1c',
   }
   const flagColor = STATUS_FLAG_COLOR[ag?.status] ?? '#9ca3af'
   const flag = `<span class="fc-ev-flag" style="border-top-color:${flagColor}" title="${ag?.status ?? ''}"></span>`
@@ -2356,14 +2390,15 @@ function profissionaisParaItem(item) {
   )
 }
 
-/** Classes de badge para cada status */
+/** Classes de badge para cada status (paleta escura) */
 function statusBadgeClass(status) {
   return ({
-    pendente:   'bg-yellow-100 text-yellow-800',
-    confirmado: 'bg-blue-100 text-blue-800',
-    concluido:  'bg-green-100 text-green-800',
-    cancelado:  'bg-red-100 text-red-800',
-  })[status] ?? 'bg-gray-100 text-gray-600'
+    pendente:        'bg-gray-600 text-gray-100',
+    confirmado:      'bg-green-700 text-white',
+    concluido:       'bg-blue-700 text-white',
+    pre_agendamento: 'bg-red-700 text-white',
+    cancelado:       'bg-red-700 text-white',
+  })[status] ?? 'bg-gray-500 text-white'
 }
 
 // ─── Tarefas Internas ──────────────────────────────────────────────────────
@@ -2797,11 +2832,28 @@ function diaSemanaCliente(s) {
   return DIAS_SEMANA[new Date(s).getDay()]
 }
 const historicoClienteItens = computed(() => {
+  const agora = new Date()
   const items = []
   for (const ag of historicoCliente.value) {
-    for (const item of ag.itens ?? []) items.push({ ...item, agStatus: ag.status })
+    for (const item of ag.itens ?? []) {
+      const dt = new Date(item.data_hora_inicio)
+      if (dt < agora) items.push({ ...item, agStatus: ag.status })
+    }
   }
   return items.sort((a, b) => new Date(b.data_hora_inicio) - new Date(a.data_hora_inicio))
+})
+
+const proximosClienteItens = computed(() => {
+  const agora = new Date()
+  const items = []
+  for (const ag of historicoCliente.value) {
+    if (ag.status === 'pre_agendamento' || ag.status === 'cancelado') continue
+    for (const item of ag.itens ?? []) {
+      const dt = new Date(item.data_hora_inicio)
+      if (dt >= agora) items.push({ ...item, agStatus: ag.status, agId: ag.id })
+    }
+  }
+  return items.sort((a, b) => new Date(a.data_hora_inicio) - new Date(b.data_hora_inicio))
 })
 
 function abrirDrawerCliente(cliente = null) {
@@ -2924,26 +2976,40 @@ function normalizarDataHoraApi(value) {
   return value
 }
 
-function carregarCoresFavoritas() {
+async function carregarCoresFavoritas() {
+  try {
+    // Tenta carregar do servidor (preferência persistida por usuário)
+    const { data } = await api.get('/preferencias/cores')
+    const lista = data?.preset_cores
+    if (Array.isArray(lista) && lista.length > 0) {
+      coresFavoritas.value = lista.map(c => normalizarHexColor(c)).filter(Boolean).slice(0, 20)
+      return
+    }
+  } catch {
+    // Fallback: localStorage para usuários sem preset salvo ainda
+  }
   try {
     const raw = localStorage.getItem('agendamento-cores-favoritas')
     const list = raw ? JSON.parse(raw) : []
     if (!Array.isArray(list)) return
-    coresFavoritas.value = list
-      .map(c => normalizarHexColor(c))
-      .filter(Boolean)
-      .slice(0, 20)
+    coresFavoritas.value = list.map(c => normalizarHexColor(c)).filter(Boolean).slice(0, 20)
   } catch {
     coresFavoritas.value = []
   }
 }
 
-function salvarCorFavorita() {
+async function salvarCorFavorita() {
   const cor = normalizarHexColor(detalheCorSelecionada.value)
   if (!cor) return
   const merged = [cor, ...coresFavoritas.value.filter(c => c !== cor)].slice(0, 20)
   coresFavoritas.value = merged
-  localStorage.setItem('agendamento-cores-favoritas', JSON.stringify(merged))
+  // Persiste no servidor (vinculado ao usuário logado)
+  try {
+    await api.put('/preferencias/cores', { preset_cores: merged })
+  } catch {
+    // Fallback: localStorage caso o servidor falhe
+    localStorage.setItem('agendamento-cores-favoritas', JSON.stringify(merged))
+  }
 }
 
 async function salvarCorAgendamento() {

@@ -36,7 +36,7 @@
         <option value="pendente">Pendente</option>
         <option value="confirmado">Confirmado</option>
         <option value="concluido">Concluído</option>
-        <option value="cancelado">Cancelado</option>
+        <option value="pre_agendamento">Pré-agendamento</option>
       </select>
       <div class="flex items-center gap-2">
         <label class="text-xs text-gray-500 font-medium">De</label>
@@ -120,17 +120,95 @@
               >Inadimplente</span>
             </td>
             <td class="px-4 py-3">
-              <button
-                v-if="!ag.pagamento && ag.status !== 'cancelado'"
-                @click="abrirModal(ag)"
-                class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md font-medium"
-              >
-                Registrar pagamento
-              </button>
+              <div class="flex flex-col gap-1.5">
+                <button
+                  v-if="!ag.pagamento && ag.status !== 'cancelado' && ag.status !== 'pre_agendamento'"
+                  @click="abrirModal(ag)"
+                  class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md font-medium"
+                >
+                  Registrar pagamento
+                </button>
+                <button
+                  v-if="ag.pagamento"
+                  @click="abrirModalEditar(ag)"
+                  class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-md font-medium"
+                >
+                  Editar pagamento
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Modal Editar Pagamento -->
+    <div v-if="modalEditarAberto" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-1">Editar Pagamento</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Agendamento <strong>#{{ agEditarSelecionado?.id }}</strong> · {{ agEditarSelecionado?.cliente?.nome }}
+        </p>
+        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          Atenção: esta operação corrige o registro sem recalcular o saldo de crédito do cliente.
+        </p>
+        <form @submit.prevent="confirmarEdicaoPagamento" class="space-y-4">
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Valor cobrado (R$) *</label>
+              <input
+                v-model="formEditar.valor"
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+            <div class="flex-1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Crédito utilizado (R$)</label>
+              <input
+                v-model="formEditar.credito_utilizado"
+                type="number"
+                step="0.01"
+                min="0"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Método *</label>
+            <select
+              v-model="formEditar.metodo"
+              required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option value="">Selecione...</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">PIX</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="cartao_debito">Cartão de Débito</option>
+            </select>
+          </div>
+          <p v-if="erroEditar" class="text-sm text-red-600">{{ erroEditar }}</p>
+          <div class="flex gap-3 pt-1">
+            <button
+              type="button"
+              @click="modalEditarAberto = false"
+              class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              :disabled="savingEditar"
+              class="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-50"
+            >
+              {{ savingEditar ? 'Salvando...' : 'Salvar correção' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Modal Pagamento -->
@@ -287,6 +365,13 @@ const formPag = ref({ valor: '', desconto: '0.00', credito_utilizado: '0.00', me
 const mostrarTotal = ref(false)
 const baseValorModal = ref('0.00') // base antes do desconto (total ou preço de serviço selecionado)
 
+// Estado do modal de edição de pagamento
+const modalEditarAberto = ref(false)
+const agEditarSelecionado = ref(null)
+const savingEditar = ref(false)
+const erroEditar = ref('')
+const formEditar = ref({ valor: '', credito_utilizado: '0.00', metodo: '' })
+
 const totalRecebido = computed(() => {
   return listaFiltrada.value
     .filter(ag => ag.pagamento)
@@ -361,6 +446,36 @@ function abrirModal(ag) {
   modalAberto.value = true
 }
 
+function abrirModalEditar(ag) {
+  agEditarSelecionado.value = ag
+  formEditar.value = {
+    valor: ag.pagamento?.valor ?? '',
+    credito_utilizado: ag.pagamento?.credito_utilizado ?? '0.00',
+    metodo: ag.pagamento?.metodo ?? '',
+  }
+  erroEditar.value = ''
+  modalEditarAberto.value = true
+}
+
+async function confirmarEdicaoPagamento() {
+  savingEditar.value = true
+  erroEditar.value = ''
+  try {
+    await api.put(`/agendamentos/${agEditarSelecionado.value.id}/pagamento`, {
+      valor: formEditar.value.valor,
+      metodo: formEditar.value.metodo,
+      credito_utilizado: formEditar.value.credito_utilizado || 0,
+    })
+    modalEditarAberto.value = false
+    toastSucesso('Pagamento corrigido com sucesso!')
+    await fetchAgendamentos()
+  } catch (e) {
+    erroEditar.value = e.response?.data?.detail || 'Erro ao editar pagamento.'
+  } finally {
+    savingEditar.value = false
+  }
+}
+
 // Desconto reduz sempre a partir do valor base selecionado (total ou serviço isolado)
 watch([() => formPag.value.desconto, () => formPag.value.credito_utilizado], ([desc, cred]) => {
   if (!agSelecionado.value) return
@@ -405,16 +520,23 @@ function totalAgendamento(ag) {
 }
 
 function statusLabel(s) {
-  return { pendente: 'Pendente', confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado' }[s] ?? s
+  return {
+    pendente:        'Pendente',
+    confirmado:      'Confirmado',
+    concluido:       'Concluído',
+    pre_agendamento: 'Pré-agendamento',
+    cancelado:       'Cancelado',
+  }[s] ?? s
 }
 
 function statusBadgeClass(s) {
   return {
-    pendente:   'bg-yellow-100 text-yellow-800',
-    confirmado: 'bg-blue-100 text-blue-800',
-    concluido:  'bg-green-100 text-green-800',
-    cancelado:  'bg-red-100 text-red-800',
-  }[s] ?? 'bg-gray-100 text-gray-600'
+    pendente:        'bg-gray-600 text-gray-100',
+    confirmado:      'bg-green-700 text-white',
+    concluido:       'bg-blue-700 text-white',
+    pre_agendamento: 'bg-red-700 text-white',
+    cancelado:       'bg-red-700 text-white',
+  }[s] ?? 'bg-gray-500 text-white'
 }
 
 function metodoPagLabel(m) {

@@ -48,7 +48,9 @@
 .dark input::placeholder,
 .dark textarea::placeholder { color: #6e6888; }
 
-/* Status badges — agendamentos */
+/* Status badges — agendamentos (paleta escura: bg-gray-600/green-700/blue-700/red-700)
+   Badges já usam fundos escuros, então ficam bem tanto em light quanto em dark mode sem override.
+   Os overrides abaixo são mantidos para outros elementos da UI que ainda usam as classes claras. */
 .dark .bg-yellow-100  { background-color: rgba(234, 179, 8, 0.15); }
 .dark .text-yellow-700 { color: #fbbf24; }
 .dark .bg-blue-100    { background-color: rgba(59, 130, 246, 0.15); }
@@ -59,6 +61,11 @@
 .dark .text-red-100   { background-color: rgba(239, 68, 68, 0.15); }
 .dark .text-red-700   { color: #f87171; }
 .dark .bg-red-50      { background-color: rgba(239, 68, 68, 0.09); }
+/* Garantir legibilidade dos badges de status escuros em dark mode */
+.dark .bg-gray-600    { background-color: #4b5563; }
+.dark .bg-green-700   { background-color: #15803d; }
+.dark .bg-blue-700    { background-color: #1d4ed8; }
+.dark .bg-red-700     { background-color: #b91c1c; }
 
 /* Role badges — usuários */
 .dark .bg-purple-100   { background-color: rgba(168, 85, 247, 0.15); }

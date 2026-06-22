@@ -124,6 +124,15 @@ class PagamentoCreate(BaseModel):
     credito_utilizado: Decimal = Decimal("0.00")
 
 
+class PagamentoUpdate(BaseModel):
+    """Permite corrigir valor e método de um pagamento já registrado (erro de lançamento)."""
+    valor: Decimal
+    metodo: str
+    # Ajuste de crédito utilizado: permite corrigir o campo sem alterar o saldo do cliente
+    # automaticamente (o operador deve ajustar o saldo manualmente se necessário).
+    credito_utilizado: Decimal = Decimal("0.00")
+
+
 class PagamentoResponse(BaseModel):
     model_config = {"from_attributes": True}
 

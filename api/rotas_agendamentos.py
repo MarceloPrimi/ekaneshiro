@@ -21,6 +21,7 @@ from schemas.agendamentos import (
     AgendamentoUpdate,
     PagamentoCreate,
     PagamentoResponse,
+    PagamentoUpdate,
 )
 from services import agendamento_service
 
@@ -60,7 +61,7 @@ def _get_agendamento_ou_404(agendamento_id: int, db: Session) -> Agendamento:
 def criar_agendamento(
     payload: AgendamentoCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     return agendamento_service.criar_agendamento(db, payload, criado_por_id=current_user.id)
 
@@ -249,6 +250,23 @@ def registrar_pagamento(
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
     return agendamento_service.registrar_pagamento(
         db, agendamento, payload, registrado_por_id=current_user.id
+    )
+
+
+@router.put(
+    "/{agendamento_id}/pagamento",
+    response_model=PagamentoResponse,
+    summary="Editar pagamento já registrado (correção de lançamento)",
+)
+def editar_pagamento(
+    agendamento_id: int,
+    payload: PagamentoUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+):
+    agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    return agendamento_service.editar_pagamento(
+        db, agendamento, payload, editado_por_id=current_user.id
     )
 
 

@@ -14,7 +14,7 @@ from db.models import (
     Servico,
     StatusAgendamentoEnum,
 )
-from schemas.agendamentos import AgendamentoCreate, PagamentoCreate
+from schemas.agendamentos import AgendamentoCreate, PagamentoCreate, PagamentoUpdate
 from services import calendario_google
 
 
@@ -23,12 +23,15 @@ from services import calendario_google
 # ---------------------------------------------------------------------------
 
 def _is_primeira_vez(db: Session, cliente_id: int) -> bool:
-    """Retorna True se este é o primeiro agendamento não-cancelado do cliente."""
+    """Retorna True se este é o primeiro agendamento ativo do cliente."""
     count = (
         db.query(Agendamento)
         .filter(
             Agendamento.cliente_id == cliente_id,
-            Agendamento.status != StatusAgendamentoEnum.cancelado,
+            Agendamento.status.notin_([
+                StatusAgendamentoEnum.cancelado,
+                StatusAgendamentoEnum.pre_agendamento,
+            ]),
         )
         .count()
     )
@@ -206,7 +209,10 @@ def _checar_conflito(
         .join(Agendamento)
         .filter(
             ItemAgendamento.profissional_id == profissional_id,
-            Agendamento.status != StatusAgendamentoEnum.cancelado,
+            Agendamento.status.notin_([
+                StatusAgendamentoEnum.cancelado,
+                StatusAgendamentoEnum.pre_agendamento,
+            ]),
             ItemAgendamento.data_hora_inicio < fim,
             ItemAgendamento.data_hora_fim > inicio,
         )
@@ -242,7 +248,10 @@ def _checar_conflito_cliente(
         .join(Agendamento)
         .filter(
             Agendamento.cliente_id == cliente_id,
-            Agendamento.status != StatusAgendamentoEnum.cancelado,
+            Agendamento.status.notin_([
+                StatusAgendamentoEnum.cancelado,
+                StatusAgendamentoEnum.pre_agendamento,
+            ]),
             ItemAgendamento.data_hora_inicio < fim,
             ItemAgendamento.data_hora_fim > inicio,
         )
@@ -540,7 +549,7 @@ def atualizar_status(
     agendamento.status = novo_status
 
     # Se cancelado, remove os eventos do Google Calendar
-    if novo_status == StatusAgendamentoEnum.cancelado:
+    if novo_status in (StatusAgendamentoEnum.pre_agendamento, StatusAgendamentoEnum.cancelado):
         for item in agendamento.itens:
             if item.google_event_id and item.profissional.google_calendar_id:
                 try:
@@ -584,10 +593,10 @@ def registrar_pagamento(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este agendamento já possui pagamento registrado.",
         )
-    if agendamento.status == StatusAgendamentoEnum.cancelado:
+    if agendamento.status in (StatusAgendamentoEnum.pre_agendamento, StatusAgendamentoEnum.cancelado):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Não é possível registrar pagamento em agendamento cancelado.",
+            detail="Não é possível registrar pagamento em agendamento cancelado ou pré-agendado.",
         )
 
     cliente = agendamento.cliente
@@ -623,6 +632,39 @@ def registrar_pagamento(
 
     # Pagamento confirma automaticamente o agendamento
     agendamento.status = StatusAgendamentoEnum.confirmado
+
+    db.commit()
+    db.refresh(pagamento)
+    return pagamento
+
+
+# ---------------------------------------------------------------------------
+# Edição de pagamento (correção de erro de lançamento)
+# ---------------------------------------------------------------------------
+
+def editar_pagamento(
+    db: Session,
+    agendamento: Agendamento,
+    payload: PagamentoUpdate,
+    editado_por_id: int,
+) -> Pagamento:
+    """Corrige valor e/ou método de um pagamento já existente.
+
+    Atualiza somente os campos informativos (valor, metodo, credito_utilizado).
+    O saldo de crédito do cliente NÃO é recalculado automaticamente — operações
+    de ajuste de saldo devem ser feitas separadamente para manter rastreabilidade.
+    """
+    pagamento = agendamento.pagamento
+    if not pagamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Este agendamento não possui pagamento registrado.",
+        )
+
+    pagamento.valor = payload.valor
+    pagamento.metodo = payload.metodo
+    pagamento.credito_utilizado = payload.credito_utilizado
+    pagamento.registrado_por_id = editado_por_id
 
     db.commit()
     db.refresh(pagamento)
