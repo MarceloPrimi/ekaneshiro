@@ -643,7 +643,6 @@
               Registrar Pagamento
             </button>
             <button
-              v-if="authStore.user?.role === 'admin' || authStore.user?.role === 'recepcionista'"
               @click="confirmarExcluirAg(detalheAg)"
               class="w-full border border-red-200 text-red-600 rounded-xl py-3 text-sm font-semibold hover:bg-red-50 transition-colors"
             >

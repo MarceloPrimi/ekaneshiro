@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from api.dependencias import (
     get_current_admin,
-    get_current_recepcionista_ou_admin,
     get_current_user,
 )
 from db.database import get_db
@@ -36,6 +35,22 @@ _EAGER_OPTIONS = [
     ),
     joinedload(Agendamento.pagamento),
 ]
+
+
+def _verificar_acesso_profissional(current_user: Usuario, agendamento: Agendamento) -> None:
+    """Profissional só pode alterar agendamentos que contenham um item seu."""
+    if current_user.role == RoleEnum.profissional:
+        if not current_user.profissional:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuário não vinculado a um profissional.",
+            )
+        prof_ids = [item.profissional_id for item in agendamento.itens]
+        if current_user.profissional.id not in prof_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você só pode alterar seus próprios agendamentos.",
+            )
 
 
 def _get_agendamento_ou_404(agendamento_id: int, db: Session) -> Agendamento:
@@ -183,9 +198,10 @@ def editar_agendamento(
     agendamento_id: int,
     payload: AgendamentoUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
     return agendamento_service.atualizar_agendamento(db, agendamento, payload, criado_por_id=current_user.id)
 
 
@@ -229,9 +245,10 @@ def atualizar_cor_agendamento(
     agendamento_id: int,
     payload: AgendamentoCorUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
     return agendamento_service.atualizar_cor(db, agendamento, payload.cor_hex)
 
 
@@ -245,9 +262,10 @@ def registrar_pagamento(
     agendamento_id: int,
     payload: PagamentoCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
     return agendamento_service.registrar_pagamento(
         db, agendamento, payload, registrado_por_id=current_user.id
     )
@@ -262,9 +280,10 @@ def editar_pagamento(
     agendamento_id: int,
     payload: PagamentoUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
     return agendamento_service.editar_pagamento(
         db, agendamento, payload, editado_por_id=current_user.id
     )
@@ -278,8 +297,9 @@ def editar_pagamento(
 def excluir_agendamento(
     agendamento_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
     db.delete(agendamento)
     db.commit()
