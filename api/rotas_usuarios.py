@@ -1,16 +1,13 @@
-import os
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.dependencias import get_current_admin, get_current_user
 from core.security import create_access_token, hash_password, verify_password
 from db.database import get_db
-from db.models import RoleEnum, Usuario
+from db.models import Usuario
 from schemas.usuarios import (
     AlterarSenhaAdmin,
     AlterarSenhaProprio,
@@ -22,46 +19,6 @@ from schemas.usuarios import (
 )
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
-
-
-class _RecoveryPayload(BaseModel):
-    secret: str
-
-
-@router.post("/recovery", status_code=status.HTTP_201_CREATED, include_in_schema=False)
-def recovery_admin(payload: _RecoveryPayload, db: Annotated[Session, Depends(get_db)]):
-    """Endpoint oculto de recuperação de acesso.
-
-    Só funciona quando a env var RECOVERY_SECRET está definida no servidor
-    e o caller envia o mesmo valor no body. Após recuperar o acesso, remova
-    a env var para desativar este endpoint permanentemente.
-    """
-    secret_env = os.getenv("RECOVERY_SECRET", "").strip()
-    if not secret_env or payload.secret != secret_env:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
-
-    USERNAME = "admin_temp"
-    SENHA = "admin123"
-
-    existente = db.query(Usuario).filter(Usuario.username == USERNAME).first()
-    if existente:
-        existente.ativo = True
-        existente.role = RoleEnum.admin
-        existente.hashed_password = hash_password(SENHA)
-        db.commit()
-        return {"msg": f"Usuário '{USERNAME}' reativado.", "username": USERNAME, "senha": SENHA}
-
-    novo = Usuario(
-        nome="Admin Temp",
-        username=USERNAME,
-        hashed_password=hash_password(SENHA),
-        role=RoleEnum.admin,
-        ativo=True,
-        criado_em=datetime.utcnow(),
-    )
-    db.add(novo)
-    db.commit()
-    return {"msg": "Usuário criado.", "username": USERNAME, "senha": SENHA}
 
 
 @router.post("/login", response_model=TokenResponse, summary="Autenticar e obter JWT")
