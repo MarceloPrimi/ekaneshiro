@@ -1106,6 +1106,12 @@
             {{ detalheTarefa.concluida ? '✓ Concluída' : 'Pendente' }}
           </span>
         </div>
+        <div v-if="!detalheTarefa.concluida" class="mb-2">
+          <button
+            @click="concluirTarefa(detalheTarefa)"
+            class="w-full bg-green-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-green-700 transition-colors"
+          >✓ Concluir tarefa</button>
+        </div>
         <div class="flex gap-2">
           <button @click="abrirModalTarefa('', detalheTarefa); detalheTarefa = null" class="flex-1 bg-indigo-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-indigo-700">Editar</button>
           <button @click="excluirTarefa(detalheTarefa)" class="flex-1 border border-red-200 text-red-500 rounded-lg py-3 text-sm hover:bg-red-50">Excluir</button>
@@ -1778,9 +1784,13 @@ const allCalendarEvents = computed(() => [
   ...calendarEventsFeriados.value,
 ])
 
-// Na visão diária por colunas, quando um profissional está filtrado,
-// exibe apenas a coluna dele. Isso mantém o foco sem informar em excesso.
+// Na visão diária por colunas, profissional vê apenas a própria coluna.
+// Admin/recepcionista podem filtrar ou ver todos.
 const profissionaisColuna = computed(() => {
+  if (isProfissional.value) {
+    const meuProf = profissionais.value.find(p => p.usuario_id === authStore.user?.id)
+    return meuProf ? [meuProf] : []
+  }
   if (filtroProfissional.value) {
     return profissionais.value.filter(p => p.id === Number(filtroProfissional.value))
   }
@@ -2485,6 +2495,12 @@ async function salvarTarefa() {
 async function excluirTarefa(t) {
   if (!confirm(`Remover a tarefa "${t.titulo}"?`)) return
   await api.delete(`/tarefas/${t.id}`)
+  detalheTarefa.value = null
+  await fetchTarefas()
+}
+
+async function concluirTarefa(t) {
+  await api.patch(`/tarefas/${t.id}`, { concluida: true })
   detalheTarefa.value = null
   await fetchTarefas()
 }

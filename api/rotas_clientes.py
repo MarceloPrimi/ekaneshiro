@@ -21,7 +21,7 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 def criar_cliente(
     payload: ClienteCreate,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    _: Annotated[Usuario, Depends(get_current_user)],
 ):
     if payload.email:
         if db.query(Cliente).filter(func.lower(Cliente.email) == payload.email.lower()).first():
@@ -92,7 +92,7 @@ def atualizar_cliente(
     cliente_id: int,
     payload: ClienteUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
+    _: Annotated[Usuario, Depends(get_current_user)],
 ):
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:

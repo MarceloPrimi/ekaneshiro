@@ -217,22 +217,7 @@ def atualizar_status(
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
-
-    # Profissional só pode marcar como Concluído os próprios agendamentos
-    from db.models import RoleEnum
-    if current_user.role == RoleEnum.profissional:
-        if payload.status != StatusAgendamentoEnum.concluido:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Profissionais só podem marcar agendamentos como 'concluído'.",
-            )
-        profissional_ids = [item.profissional_id for item in agendamento.itens]
-        if not current_user.profissional or current_user.profissional.id not in profissional_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você só pode atualizar seus próprios agendamentos.",
-            )
-
+    _verificar_acesso_profissional(current_user, agendamento)
     return agendamento_service.atualizar_status(db, agendamento, payload.status)
 
 
