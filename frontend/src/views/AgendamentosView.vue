@@ -72,6 +72,16 @@
 
             <button
               class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
+              :class="filtroAgendamentosRecentes ? 'text-blue-700 bg-blue-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
+              @click="filtroAgendamentosRecentes = !filtroAgendamentosRecentes; showMobileMenu = false"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" :class="filtroAgendamentosRecentes ? 'text-blue-500' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="flex-1">Agendamentos recentes</span>
+              <svg v-if="filtroAgendamentosRecentes" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </button>
+
+            <button
+              class="w-full text-left px-4 py-3 text-sm flex items-center gap-3"
               :class="mostrarTarefas ? 'text-indigo-700 bg-indigo-50/60 font-medium' : 'text-gray-600 hover:bg-gray-50'"
               @click="mostrarTarefas = !mostrarTarefas; showMobileMenu = false"
             >
@@ -109,6 +119,15 @@
           >
             Pendentes próximos
             <span v-if="agendamentosPendentesProximos.length" class="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ agendamentosPendentesProximos.length }}</span>
+          </button>
+
+          <button
+            class="h-11 px-3 border rounded-lg text-sm flex items-center gap-1.5"
+            :class="filtroAgendamentosRecentes ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+            @click="filtroAgendamentosRecentes = !filtroAgendamentosRecentes"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Recentes
           </button>
 
           <button
@@ -211,6 +230,60 @@
               class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
               @click="alterarStatus(ag.id, 'confirmado'); ag.status = 'confirmado'"
             >Confirmar</button>
+            <button
+              class="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-white font-medium transition-colors"
+              @click="detalheAg = ag"
+            >Ver</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL: Agendamentos Recentes (últimos 10 criados) -->
+    <div v-if="filtroAgendamentosRecentes" class="flex-shrink-0 bg-blue-50 border border-blue-200 rounded-xl mb-3 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-blue-200">
+        <div class="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="text-sm font-semibold text-blue-800">Agendamentos recentes — últimos 10 criados</span>
+          <span class="bg-blue-200 text-blue-900 text-xs font-bold px-2 py-0.5 rounded-full">{{ agendamentosRecentes.length }}</span>
+        </div>
+        <button @click="filtroAgendamentosRecentes = false" class="text-blue-500 hover:text-blue-700 text-lg leading-none">×</button>
+      </div>
+      <div v-if="agendamentosRecentes.length === 0" class="px-4 py-5 text-sm text-blue-700 italic text-center">
+        Nenhum agendamento encontrado.
+      </div>
+      <div v-else class="divide-y divide-blue-100 max-h-72 overflow-y-auto">
+        <div
+          v-for="ag in agendamentosRecentes"
+          :key="ag.id"
+          class="flex items-start justify-between gap-3 px-4 py-3 hover:bg-blue-100/60 transition-colors"
+        >
+          <!-- Info -->
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-gray-800">{{ ag.cliente?.nome || '—' }}</span>
+              <span v-if="ag.cliente?.telefone" class="text-xs text-gray-500">{{ ag.cliente.telefone }}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                :class="{
+                  'bg-amber-100 text-amber-700': ag.status === 'pendente',
+                  'bg-green-100 text-green-700': ag.status === 'confirmado',
+                  'bg-gray-100 text-gray-600': ag.status === 'concluido',
+                  'bg-purple-100 text-purple-700': ag.status === 'pre_agendamento',
+                  'bg-red-100 text-red-600': ag.status === 'cancelado',
+                }"
+              >{{ ag.status }}</span>
+            </div>
+            <div class="mt-0.5 space-y-0.5">
+              <div v-for="item in ag.itens" :key="item.id" class="text-xs text-gray-600">
+                <span class="font-medium">{{ item.servico?.nome }}</span>
+                <span class="text-gray-400"> · {{ item.profissional?.nome }}</span>
+                <span class="text-gray-500"> · {{ formatDate(item.data_hora_inicio) }}</span>
+              </div>
+            </div>
+            <div class="mt-1 text-xs text-gray-400">Criado em {{ formatDate(ag.criado_em) }}</div>
+          </div>
+          <!-- Ações -->
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             <button
               class="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-white font-medium transition-colors"
               @click="detalheAg = ag"
@@ -1269,6 +1342,7 @@ const loadingClientes = ref(false)
 const filtroProfissional = ref(null)
 const buscaCalendario = ref('')
 const filtroPendentesProximos = ref(false)
+const filtroAgendamentosRecentes = ref(false)
 
 /** Retorna a data daqui a `days` dias úteis (seg=folga: pula segunda-feira) */
 function addDiasUteis(date, days) {
@@ -1297,6 +1371,12 @@ const agendamentosPendentesProximos = computed(() => {
       const bMin = Math.min(...(b.itens ?? []).map(i => new Date(i.data_hora_inicio).getTime()))
       return aMin - bMin
     })
+})
+
+const agendamentosRecentes = computed(() => {
+  return [...agendamentos.value]
+    .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
+    .slice(0, 10)
 })
 
 // ─── Viewport & Mobile UI ──────────────────────────────────────────────────
