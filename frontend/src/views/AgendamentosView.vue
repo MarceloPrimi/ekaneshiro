@@ -2210,7 +2210,13 @@ function abrirModalNovo(dt = '', profId = null) {
   if (!clientes.value.length) fetchClientes()
   modalMode.value = 'create'
   const item = emptyItem(dt)
-  if (profId) item.profissional_id = profId
+  if (isProfissional.value) {
+    // Profissional sempre agenda para si mesmo — pré-preenche e bloqueia a seleção
+    const meuProf = profissionais.value.find(p => p.usuario_id === authStore.user?.id)
+    if (meuProf) item.profissional_id = meuProf.id
+  } else if (profId) {
+    item.profissional_id = profId
+  }
   formData.value = { id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [item],
     recurrence: null, recurrence_count: null, edit_scope: 'this' }
   clienteBuscaNome.value = ''
@@ -2247,7 +2253,13 @@ function addItem() {
   // Usa o fim do último item como início do novo (encadeamento sequencial)
   const lastItem = formData.value.itens[formData.value.itens.length - 1]
   const novoInicio = lastItem?.data_hora_fim || lastItem?.data_hora_inicio || ''
-  formData.value.itens.push(emptyItem(novoInicio))
+  const novo = emptyItem(novoInicio)
+  // Profissional sempre agenda para si mesmo
+  if (isProfissional.value) {
+    const meuProf = profissionais.value.find(p => p.usuario_id === authStore.user?.id)
+    if (meuProf) novo.profissional_id = meuProf.id
+  }
+  formData.value.itens.push(novo)
 }
 function removeItem(idx) { formData.value.itens.splice(idx, 1) }
 
@@ -2471,12 +2483,19 @@ function colunaSlotClick(profId, horaSlot) {
   abrirModalNovo(dt, profId)
 }
 
-/** Retorna apenas os profissionais habilitados para o serviço selecionado */
+/** Retorna apenas os profissionais habilitados para o serviço selecionado.
+ *  Para usuário com role=profissional, retorna somente o próprio perfil. */
 function profissionaisParaItem(item) {
-  if (!item.servico_id) return profissionais.value
-  return profissionais.value.filter(p =>
-    p.servicos?.some(s => s.id === Number(item.servico_id))
-  )
+  let lista = profissionais.value
+
+  // Profissional só pode agendar para si mesmo
+  if (isProfissional.value) {
+    const meuProf = profissionais.value.find(p => p.usuario_id === authStore.user?.id)
+    lista = meuProf ? [meuProf] : []
+  }
+
+  if (!item.servico_id) return lista
+  return lista.filter(p => p.servicos?.some(s => s.id === Number(item.servico_id)))
 }
 
 /** Classes de badge para cada status (paleta escura) */
