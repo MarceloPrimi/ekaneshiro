@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from api.dependencias import get_current_user
+from api.dependencias import get_current_recepcionista_ou_admin, get_current_user
 from db.database import get_db
 from db.models import TarefaInterna, Usuario
 from schemas.tarefas import TarefaCreate, TarefaResponse, TarefaUpdate
@@ -30,12 +30,12 @@ def listar_tarefas(
     "/",
     response_model=TarefaResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Criar tarefa interna",
+    summary="Criar tarefa interna (recepcionista/admin)",
 )
 def criar_tarefa(
     payload: TarefaCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(get_current_user)],
+    current_user: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
 ):
     nova = TarefaInterna(**payload.model_dump(), criado_por_id=current_user.id)
     db.add(nova)
@@ -44,12 +44,16 @@ def criar_tarefa(
     return nova
 
 
-@router.patch("/{tarefa_id}", response_model=TarefaResponse, summary="Atualizar tarefa")
+@router.patch(
+    "/{tarefa_id}",
+    response_model=TarefaResponse,
+    summary="Atualizar tarefa (recepcionista/admin)",
+)
 def atualizar_tarefa(
     tarefa_id: int,
     payload: TarefaUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_user)],
+    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
 ):
     tarefa = _get_ou_404(tarefa_id, db)
     for campo, valor in payload.model_dump(exclude_unset=True).items():
@@ -59,11 +63,15 @@ def atualizar_tarefa(
     return tarefa
 
 
-@router.delete("/{tarefa_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Excluir tarefa")
+@router.delete(
+    "/{tarefa_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Excluir tarefa (recepcionista/admin)",
+)
 def excluir_tarefa(
     tarefa_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_user)],
+    _: Annotated[Usuario, Depends(get_current_recepcionista_ou_admin)],
 ):
     tarefa = _get_ou_404(tarefa_id, db)
     db.delete(tarefa)

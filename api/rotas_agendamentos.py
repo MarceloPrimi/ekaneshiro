@@ -38,7 +38,7 @@ _EAGER_OPTIONS = [
 
 
 def _verificar_acesso_profissional(current_user: Usuario, agendamento: Agendamento) -> None:
-    """Profissional só pode alterar agendamentos que contenham um item seu."""
+    """Profissional só pode acessar/alterar agendamentos que contenham um item seu."""
     if current_user.role == RoleEnum.profissional:
         if not current_user.profissional:
             raise HTTPException(
@@ -51,6 +51,22 @@ def _verificar_acesso_profissional(current_user: Usuario, agendamento: Agendamen
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você só pode alterar seus próprios agendamentos.",
             )
+
+
+def _verificar_itens_profissional(current_user: Usuario, itens) -> None:
+    """Profissional só pode criar/editar itens atribuídos a si mesmo."""
+    if current_user.role == RoleEnum.profissional:
+        if not current_user.profissional:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuário não vinculado a um profissional.",
+            )
+        for item in itens:
+            if item.profissional_id != current_user.profissional.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Você só pode criar agendamentos para si mesmo.",
+                )
 
 
 def _get_agendamento_ou_404(agendamento_id: int, db: Session) -> Agendamento:
@@ -78,6 +94,7 @@ def criar_agendamento(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
+    _verificar_itens_profissional(current_user, payload.itens)
     return agendamento_service.criar_agendamento(db, payload, criado_por_id=current_user.id)
 
 
@@ -184,9 +201,11 @@ def listar_agendamentos(
 def buscar_agendamento(
     agendamento_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[Usuario, Depends(get_current_user)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
 ):
-    return _get_agendamento_ou_404(agendamento_id, db)
+    agendamento = _get_agendamento_ou_404(agendamento_id, db)
+    _verificar_acesso_profissional(current_user, agendamento)
+    return agendamento
 
 
 @router.put(
@@ -202,6 +221,7 @@ def editar_agendamento(
 ):
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
     _verificar_acesso_profissional(current_user, agendamento)
+    _verificar_itens_profissional(current_user, payload.itens)
     return agendamento_service.atualizar_agendamento(db, agendamento, payload, criado_por_id=current_user.id)
 
 

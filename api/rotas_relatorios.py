@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencias import get_current_admin, get_current_user
 from db.database import get_db
-from db.models import Agendamento, ItemAgendamento, Profissional, ProfissionalServico, Servico
+from db.models import Agendamento, ItemAgendamento, Profissional, ProfissionalServico, RoleEnum, Servico, Usuario
 from services import sheets_google
 
 router = APIRouter(prefix="/relatorios", tags=["Relatórios"])
@@ -54,13 +54,14 @@ def exportar_para_sheets(
 )
 def clientes_por_profissional(
     db: Session = Depends(get_db),
-    _user=Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """
     Retorna a contagem de clientes únicos atendidos por cada profissional,
     considerando apenas agendamentos com status 'concluido'.
+    Profissional enxerga apenas os próprios dados.
     """
-    rows = (
+    query = (
         db.query(
             Profissional.id.label("profissional_id"),
             Profissional.nome.label("profissional_nome"),
@@ -69,10 +70,17 @@ def clientes_por_profissional(
         .join(ItemAgendamento, ItemAgendamento.profissional_id == Profissional.id)
         .join(Agendamento, Agendamento.id == ItemAgendamento.agendamento_id)
         .filter(Agendamento.status == "concluido")
-        .group_by(Profissional.id, Profissional.nome)
-        .order_by(func.count(func.distinct(Agendamento.cliente_id)).desc())
-        .all()
     )
+
+    if current_user.role == RoleEnum.profissional:
+        if not current_user.profissional:
+            return []
+        query = query.filter(Profissional.id == current_user.profissional.id)
+
+    rows = query.group_by(Profissional.id, Profissional.nome).order_by(
+        func.count(func.distinct(Agendamento.cliente_id)).desc()
+    ).all()
+
     return [
         {
             "profissional_id": r.profissional_id,
@@ -90,7 +98,7 @@ def clientes_por_profissional(
 def faturamento_por_mes(
     mes: str = Query(..., description="Mês no formato YYYY-MM"),
     db: Session = Depends(get_db),
-    _user=Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """
     Calcula o faturamento de serviços concluídos em um mês.
@@ -101,7 +109,8 @@ def faturamento_por_mes(
     Ou seja: se o profissional definiu seu próprio preço para aquele serviço,
     ele é usado. Caso contrário, cai para o preço padrão do catálogo.
 
-    Retorna o total geral + breakdown por profissional.
+    Profissional enxerga apenas os próprios dados (sem total_geral).
+    Admin/recepcionista recebem total geral + breakdown completo.
     """
     if not _MES_RE.match(mes):
         raise HTTPException(
@@ -116,7 +125,7 @@ def faturamento_por_mes(
     # Preço efetivo = preco_proprio do profissional, ou preco padrão do serviço
     preco_efetivo = func.coalesce(ProfissionalServico.preco_proprio, Servico.preco)
 
-    rows = (
+    query = (
         db.query(
             Profissional.id.label("profissional_id"),
             Profissional.nome.label("profissional_nome"),
@@ -138,10 +147,16 @@ def faturamento_por_mes(
             ItemAgendamento.data_hora_inicio >= inicio,
             ItemAgendamento.data_hora_inicio < fim,
         )
-        .group_by(Profissional.id, Profissional.nome)
-        .order_by(func.sum(preco_efetivo).desc())
-        .all()
     )
+
+    if current_user.role == RoleEnum.profissional:
+        if not current_user.profissional:
+            return {"mes": mes, "total_geral": None, "por_profissional": []}
+        query = query.filter(Profissional.id == current_user.profissional.id)
+
+    rows = query.group_by(Profissional.id, Profissional.nome).order_by(
+        func.sum(preco_efetivo).desc()
+    ).all()
 
     por_profissional = [
         {
@@ -152,7 +167,12 @@ def faturamento_por_mes(
         }
         for r in rows
     ]
-    total_geral = sum(p["total"] for p in por_profissional)
+
+    # Profissional não enxerga total geral (ocultaria dados de outros)
+    total_geral = (
+        None if current_user.role == RoleEnum.profissional
+        else sum(p["total"] for p in por_profissional)
+    )
 
     return {
         "mes": mes,
