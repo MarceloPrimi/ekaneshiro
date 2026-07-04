@@ -26,17 +26,26 @@ const router = createRouter({
   routes,
 })
 
+// Resetado a cada carregamento de página (não persiste no localStorage).
+// Garante que tokens antigos em cache sejam validados contra o servidor
+// antes de renderizar qualquer rota protegida, sem round-trip extra por navegação.
+let tokenVerificadoNaSessao = false
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) return '/login'
-  if (to.meta.requiresAuth && auth.isAuthenticated && !auth.user) {
+
+  if (to.meta.requiresAuth && auth.isAuthenticated && !tokenVerificadoNaSessao) {
     try {
       await auth.fetchMe()
+      tokenVerificadoNaSessao = true
     } catch {
       auth.logout()
       return '/login'
     }
   }
+
   if (to.meta.guest && auth.isAuthenticated) return '/agendamentos'
   if (to.meta.adminOnly && !auth.isAdmin) return '/agendamentos'
 })
