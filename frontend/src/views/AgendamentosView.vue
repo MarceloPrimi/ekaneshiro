@@ -1146,6 +1146,13 @@
               <input v-model="formTarefa.data_hora_fim" type="datetime-local" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
           </div>
+          <div v-if="isRecepcionistaOuAdmin">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
+            <select v-model="formTarefa.responsavel_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option :value="null">— Nenhum (uso próprio da recepção) —</option>
+              <option v-for="p in profissionais.filter(p => p.usuario_id)" :key="p.id" :value="p.usuario_id">{{ p.nome }}</option>
+            </select>
+          </div>
           <div class="flex items-center gap-2">
             <input v-model="formTarefa.concluida" type="checkbox" id="cb-concluida" class="accent-indigo-600" />
             <label for="cb-concluida" class="text-sm text-gray-700">Tarefa concluída</label>
@@ -1174,6 +1181,7 @@
         </div>
         <p v-if="detalheTarefa.descricao" class="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 mb-4">{{ detalheTarefa.descricao }}</p>
         <div class="text-sm text-gray-500 mb-1">{{ formatDate(detalheTarefa.data_hora_inicio) }}<span v-if="detalheTarefa.data_hora_fim"> → {{ formatHoraCliente(detalheTarefa.data_hora_fim) }}</span></div>
+        <div v-if="detalheTarefa.responsavel" class="text-xs text-indigo-600 mb-2 font-medium">Responsável: {{ detalheTarefa.responsavel.nome }}</div>
         <div class="flex items-center gap-2 mt-3 mb-4">
           <span :class="detalheTarefa.concluida ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'" class="text-xs font-semibold px-2.5 py-0.5 rounded-full">
             {{ detalheTarefa.concluida ? '✓ Concluída' : 'Pendente' }}

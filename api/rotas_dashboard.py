@@ -125,12 +125,17 @@ def dashboard_init(
     agendamentos = agendamentos_query.all()
 
     # Eager-load responsavel para evitar N+1 / lazy-load fora de sessão
-    tarefas = (
+    tarefas_query = (
         db.query(TarefaInterna)
         .options(joinedload(TarefaInterna.responsavel))
         .order_by(TarefaInterna.data_hora_inicio)
-        .all()
     )
+    if current_user.role == RoleEnum.profissional:
+        tarefas_query = tarefas_query.filter(
+            (TarefaInterna.responsavel_id == current_user.id)
+            | (TarefaInterna.criado_por_id == current_user.id)
+        )
+    tarefas = tarefas_query.all()
 
     return {
         "servicos": [ServicoResponse.model_validate(s) for s in servicos],
