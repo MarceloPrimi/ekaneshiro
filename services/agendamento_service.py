@@ -303,6 +303,8 @@ def criar_agendamento(
         itens_preparados.append((item, profissional, servico, fim))
 
     # Cliente pode ter serviços simultâneos; bloqueio permanece apenas por profissional.
+    for item, profissional, servico, fim in itens_preparados:
+        _checar_conflito(db, profissional.id, item.data_hora_inicio, fim)
 
     # 2. Calcular primeira_vez ANTES de criar o agendamento (contagem atual = 0)
     eh_primeira_vez = _is_primeira_vez(db, payload.cliente_id)
@@ -442,6 +444,10 @@ def atualizar_agendamento(
         db.delete(item_antigo)
     db.flush()
 
+    # Verifica conflitos após remoção dos itens antigos — sem risco de falso positivo
+    for item, profissional, servico, fim in itens_preparados:
+        _checar_conflito(db, profissional.id, item.data_hora_inicio, fim)
+
     # 4. Atualizar cabeçalho
     agendamento.cliente_id = payload.cliente_id
     agendamento.cor_hex = payload.cor_hex
@@ -497,42 +503,84 @@ def atualizar_agendamento(
         )
 
     # ── Gerenciar série recorrente ──────────────────────────────────────────
-    # Sempre que rrule mudar (adicionada, alterada ou removida), recriar filhos.
-    _deletar_filhos(db, agendamento.id)
+    edit_scope = payload.edit_scope
+    is_child = agendamento.parent_id is not None
 
-    if new_rrule:
-        _autor = criado_por_id or agendamento.criado_por_id
-        try:
-            _criar_filhos_recorrentes(db, agendamento, itens_preparados, new_rrule, _autor)
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Erro ao gerar recorrências do agendamento.",
-            )
-    else:
-        db.commit()  # persiste a deleção de eventuais filhos antigos
+    if is_child and edit_scope == 'this':
+        # Desvincula a ocorrência da série — ela se torna independente.
+        # Edições futuras na série não afetarão mais este registro.
+        agendamento.parent_id = None
+        db.commit()
+        db.refresh(agendamento)
+        return agendamento
 
-    # ── edit_scope = 'all': propagar alterações aos demais filhos da série ──
-    # Se este agendamento é um filho (tem parent_id) e o escopo é 'all',
-    # redirecionar a edição ao pai e recriar a série toda a partir do pai.
-    if getattr(payload, 'edit_scope', 'this') == 'all' and agendamento.parent_id is not None:
-        pai = db.query(Agendamento).filter(Agendamento.id == agendamento.parent_id).first()
+    if is_child and edit_scope == 'all':
+        # Propaga as mudanças ao pai e reconstrói toda a série.
+        pai = db.query(Agendamento).filter(
+            Agendamento.id == agendamento.parent_id
+        ).first()
         if pai:
-            pai.cliente_id = agendamento.cliente_id
-            pai.cor_hex = agendamento.cor_hex
-            pai.observacoes = agendamento.observacoes
-            pai.categoria_id = agendamento.categoria_id
-            pai.recurrence_rule = new_rrule
+            pai.cliente_id = payload.cliente_id
+            pai.cor_hex = payload.cor_hex
+            pai.observacoes = payload.observacoes
+            pai.categoria_id = payload.categoria_id
+            pai.mini_etiquetas = agendamento.mini_etiquetas
+            # Preserva a rrule do pai — filhos não carregam recurrence no payload
+            parent_rrule = pai.recurrence_rule
+            # Substitui os itens do pai pelos novos
+            for item_pai in list(pai.itens):
+                db.delete(item_pai)
+            db.flush()
+            for item, profissional, servico, fim in itens_preparados:
+                db.add(ItemAgendamento(
+                    agendamento_id=pai.id,
+                    servico_id=servico.id,
+                    profissional_id=profissional.id,
+                    data_hora_inicio=item.data_hora_inicio,
+                    data_hora_fim=fim,
+                    google_event_id=None,
+                ))
+            # Reconstrói todos os filhos a partir do pai atualizado
             _deletar_filhos(db, pai.id)
-            if new_rrule:
-                _criar_filhos_recorrentes(
-                    db, pai, itens_preparados, new_rrule,
-                    criado_por_id or pai.criado_por_id
-                )
+            if parent_rrule:
+                try:
+                    _criar_filhos_recorrentes(
+                        db, pai, itens_preparados, parent_rrule,
+                        criado_por_id or pai.criado_por_id,
+                    )
+                except Exception:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Erro ao gerar recorrências do agendamento.",
+                    )
             db.commit()
+            db.refresh(pai)
+            return pai
+        # Pai não encontrado: apenas salva as alterações do próprio filho
+        db.commit()
+        db.refresh(agendamento)
+        return agendamento
 
+    # ── Editando o pai diretamente ──────────────────────────────────────────
+    if edit_scope == 'all':
+        # Reconstrói a série inteira a partir do pai
+        _deletar_filhos(db, agendamento.id)
+        if new_rrule:
+            _autor = criado_por_id or agendamento.criado_por_id
+            try:
+                _criar_filhos_recorrentes(
+                    db, agendamento, itens_preparados, new_rrule, _autor
+                )
+            except Exception:
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Erro ao gerar recorrências do agendamento.",
+                )
+    # edit_scope == 'this': não toca nos filhos existentes
+
+    db.commit()
     db.refresh(agendamento)
     return agendamento
 

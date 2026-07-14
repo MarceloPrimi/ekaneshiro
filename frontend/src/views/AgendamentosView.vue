@@ -563,8 +563,8 @@
             </div>
           </div>
 
-          <!-- Escopo de edição (apenas ao editar série recorrente) -->
-          <div v-if="modalMode === 'edit' && formData.recurrence" class="flex gap-3">
+          <!-- Escopo de edição (pai tem recurrence; filho tem parent_id) -->
+          <div v-if="modalMode === 'edit' && (formData.recurrence || formData.parent_id)" class="flex gap-3">
             <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
               <input type="radio" v-model="formData.edit_scope" value="this" class="accent-rose-500" />
               Apenas este
@@ -1436,7 +1436,7 @@ const erroPagAg = ref('')
 const basePagAg = ref('0.00')
 const formPagAg = ref({ valor: '', desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' })
 const formData = ref({ id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [],
-  recurrence: null, recurrence_count: null, edit_scope: 'this' })
+  recurrence: null, recurrence_count: null, edit_scope: 'this', parent_id: null })
 
 // Decision modal — abre ao clicar na célula do calendário
 const decisionModal = ref({ show: false, dataHora: null, posX: 0, posY: 0 })
@@ -2226,7 +2226,7 @@ function abrirModalNovo(dt = '', profId = null) {
     item.profissional_id = profId
   }
   formData.value = { id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [item],
-    recurrence: null, recurrence_count: null, edit_scope: 'this' }
+    recurrence: null, recurrence_count: null, edit_scope: 'this', parent_id: null }
   clienteBuscaNome.value = ''
   modalError.value = ''
   sugestaoItemIdx.value = -1
@@ -2250,6 +2250,7 @@ function abrirModalEditar(ag) {
     recurrence: rruleToFreq(ag.recurrence_rule),
     recurrence_count: rruleToCount(ag.recurrence_rule),
     edit_scope: 'this',
+    parent_id: ag.parent_id || null,
   }
   clienteBuscaNome.value = ag.cliente?.nome || ''
   modalError.value = ''
@@ -2746,8 +2747,19 @@ async function salvarModal() {
       const { data } = await api.post('/agendamentos/', payload)
       respData = data
     }
-    // Atualiza localmente sem refetch completo — mantém a view atual do calendário
-    _upsertAgendamentoLocal(respData)
+    if (modalMode.value === 'edit' && formData.value.edit_scope === 'all') {
+      // edit_scope='all' reconstrói a série inteira no backend.
+      // Refetch da janela carregada para remover siblings stale e refletir a nova série.
+      await fetchAgendamentos({
+        silent: true,
+        merge: false,
+        fromDate: loadedFrom.value,
+        toDate: loadedTo.value,
+      })
+    } else {
+      // Atualiza localmente sem refetch completo — mantém a view atual do calendário
+      _upsertAgendamentoLocal(respData)
+    }
     showModal.value = false
     toastSucesso(modalMode.value === 'edit' ? 'Agendamento atualizado!' : 'Agendamento criado!')
   } catch (e) {
