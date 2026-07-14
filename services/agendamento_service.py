@@ -196,10 +196,11 @@ def _checar_conflito(
     inicio: object,
     fim: object,
     excluir_item_id: int | None = None,
-) -> None:
+) -> str | None:
     """
-    Garante que o profissional não possui outro ItemAgendamento
-    que sobreponha o intervalo [inicio, fim).
+    Verifica se o profissional possui outro ItemAgendamento que sobreponha
+    o intervalo [inicio, fim). Retorna uma mensagem de aviso caso haja conflito,
+    mas não impede o agendamento.
 
     Condição de sobreposição:
         existente.inicio < novo.fim  AND  existente.fim > novo.inicio
@@ -223,13 +224,11 @@ def _checar_conflito(
     if query.first():
         profissional_obj = db.get(Profissional, profissional_id)
         nome = profissional_obj.nome if profissional_obj else str(profissional_id)
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"{nome} já possui agendamento "
-                f"conflitante entre {_fmt_dt(inicio)} e {_fmt_dt(fim)}."
-            ),
+        return (
+            f"{nome} já possui agendamento "
+            f"conflitante entre {_fmt_dt(inicio)} e {_fmt_dt(fim)}."
         )
+    return None
 
 
 def _checar_conflito_cliente(
@@ -302,7 +301,7 @@ def criar_agendamento(
             fim = item.data_hora_inicio + timedelta(minutes=servico.duracao_minutos)
         itens_preparados.append((item, profissional, servico, fim))
 
-    # Cliente pode ter serviços simultâneos; bloqueio permanece apenas por profissional.
+    # Conflitos de horário geram apenas aviso; o agendamento é permitido mesmo assim.
     for item, profissional, servico, fim in itens_preparados:
         _checar_conflito(db, profissional.id, item.data_hora_inicio, fim)
 
@@ -444,7 +443,7 @@ def atualizar_agendamento(
         db.delete(item_antigo)
     db.flush()
 
-    # Verifica conflitos após remoção dos itens antigos — sem risco de falso positivo
+    # Conflitos de horário geram apenas aviso; o agendamento é permitido mesmo assim.
     for item, profissional, servico, fim in itens_preparados:
         _checar_conflito(db, profissional.id, item.data_hora_inicio, fim)
 
