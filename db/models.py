@@ -370,6 +370,101 @@ class TarefaInterna(Base):
 
 
 # ---------------------------------------------------------------------------
+# Comanda — sistema de caixa tipo padaria
+# ---------------------------------------------------------------------------
+
+class StatusComandaEnum(str, enum.Enum):
+    aberta = "aberta"
+    fechada = "fechada"
+    cancelada = "cancelada"
+
+
+class TipoItemComandaEnum(str, enum.Enum):
+    agendamento = "agendamento"      # item vindo de um ItemAgendamento existente
+    servico_avulso = "servico_avulso"  # serviço adicionado no caixa, sem agendamento prévio
+    produto = "produto"              # produto vendido avulsamente
+
+
+class Comanda(Base):
+    __tablename__ = "comandas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(
+        Enum(StatusComandaEnum),
+        nullable=False,
+        default=StatusComandaEnum.aberta,
+        index=True,
+    )
+    observacoes = Column(Text, nullable=True)
+    aberta_em = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    fechada_em = Column(DateTime, nullable=True)
+    criada_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
+    itens = relationship(
+        "ItemComanda", back_populates="comanda", cascade="all, delete-orphan"
+    )
+    pagamentos = relationship(
+        "PagamentoComanda", back_populates="comanda", cascade="all, delete-orphan"
+    )
+
+
+class ItemComanda(Base):
+    __tablename__ = "itens_comanda"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comanda_id = Column(Integer, ForeignKey("comandas.id"), nullable=False, index=True)
+    tipo = Column(Enum(TipoItemComandaEnum), nullable=False)
+
+    # Referência ao agendamento-pai (para rastreabilidade e agrupamento)
+    agendamento_id = Column(Integer, ForeignKey("agendamentos.id"), nullable=True, index=True)
+    # Referência ao item específico do agendamento (unique → impede cobrança dupla)
+    item_agendamento_id = Column(
+        Integer, ForeignKey("itens_agendamento.id"), nullable=True, unique=True
+    )
+
+    # Quem consumiu este serviço (pode ser diferente de quem paga)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
+
+    # Quem executou o serviço (usado em relatórios financeiros por profissional)
+    profissional_id = Column(Integer, ForeignKey("profissionais.id"), nullable=True, index=True)
+
+    # Qual serviço do catálogo (nullable para itens livres)
+    servico_id = Column(Integer, ForeignKey("servicos.id"), nullable=True)
+
+    # Descrição livre (complementa ou substitui o serviço para itens avulsos)
+    descricao = Column(String(300), nullable=True)
+
+    # Preço no momento da venda — congelado para histórico imutável
+    valor_unitario = Column(Numeric(10, 2), nullable=False)
+    quantidade = Column(Integer, nullable=False, default=1)
+    desconto = Column(Numeric(10, 2), nullable=False, default=0.00)
+
+    comanda = relationship("Comanda", back_populates="itens")
+    agendamento = relationship("Agendamento")
+    item_agendamento = relationship("ItemAgendamento")
+    cliente = relationship("Cliente")
+    profissional = relationship("Profissional")
+    servico = relationship("Servico")
+
+
+class PagamentoComanda(Base):
+    __tablename__ = "pagamentos_comanda"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comanda_id = Column(Integer, ForeignKey("comandas.id"), nullable=False, index=True)
+    valor = Column(Numeric(10, 2), nullable=False)
+    metodo = Column(String(50), nullable=False)   # "pix" | "dinheiro" | "cartao_credito" | …
+    credito_utilizado = Column(Numeric(10, 2), nullable=False, default=0.00)
+    # Quem está pagando (pode ser diferente de quem consumiu o serviço)
+    pagador_cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    pago_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    registrado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
+    comanda = relationship("Comanda", back_populates="pagamentos")
+    pagador = relationship("Cliente")
+
+
+# ---------------------------------------------------------------------------
 # Preferências do usuário (presets de cores para agendamentos)
 # ---------------------------------------------------------------------------
 
