@@ -710,10 +710,14 @@
               Editar Agendamento
             </button>
             <button
-              @click="abrirModalPagamento(detalheAg); detalheAg = null"
-              class="w-full border border-green-300 text-green-700 rounded-xl py-3 text-sm font-semibold hover:bg-green-50 transition-colors mb-2"
+              @click="abrirComandaAg(detalheAg); detalheAg = null"
+              :disabled="abrindoComandaAg === detalheAg?.id"
+              class="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-xl py-3 text-sm font-semibold transition-colors mb-2 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Registrar Pagamento
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              {{ abrindoComandaAg === detalheAg?.id ? 'Abrindo comanda...' : 'Abrir Comanda' }}
             </button>
             <button
               @click="confirmarExcluirAg(detalheAg)"
@@ -1309,6 +1313,14 @@
       </div>
     </div>
 
+    <!-- Comanda Modal (aberta a partir do calendário) -->
+    <ComandaModal
+      v-model="comandaAg"
+      :agendamentos="agendamentos"
+      @fechada="fetchAgendamentos"
+      @cancelada="fetchAgendamentos"
+    />
+
   </div>
 </template>
 
@@ -1329,6 +1341,7 @@ import ptBrLocale from '@fullcalendar/core/locales/pt-br'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 import CalendarClickModal from '@/components/CalendarClickModal.vue'
+import ComandaModal from '@/components/ComandaModal.vue'
 
 const { sucesso: toastSucesso } = useToast()
 
@@ -1428,7 +1441,35 @@ const STATUS_LABELS = {
   cancelado:       'Cancelado',
 }
 
-// Pagamento rápido a partir do agendamento
+// Comanda a partir do calendário
+const comandaAg = ref(null)
+const abrindoComandaAg = ref(null)
+
+async function abrirComandaAg(ag) {
+  if (!ag) return
+  abrindoComandaAg.value = ag.id
+  try {
+    const { data: nova } = await api.post('/comandas/', {})
+    comandaAg.value = {
+      ...nova,
+      itens: [], pagamentos: [],
+      total_itens: '0.00', total_pago: '0.00', saldo_restante: '0.00',
+      _carregando: true,
+    }
+    abrindoComandaAg.value = null
+    await api.post(`/comandas/${nova.id}/itens/agendamento`, {
+      agendamento_id: ag.id,
+      cliente_id: ag.cliente_id,
+    })
+    const { data } = await api.get(`/comandas/${nova.id}`)
+    comandaAg.value = data
+  } catch (e) {
+    abrindoComandaAg.value = null
+    if (comandaAg.value) comandaAg.value = { ...comandaAg.value, _carregando: false }
+  }
+}
+
+// Pagamento rápido a partir do agendamento (legado — mantido para compatibilidade)
 const modalPagAberto = ref(false)
 const agPagSelecionado = ref(null)
 const savingPagAg = ref(false)
