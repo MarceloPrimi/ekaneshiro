@@ -600,7 +600,7 @@
       - hidden + :class é mais performático para alternância frequente
     -->
     <div v-if="detalheAg" class="fixed inset-0 bg-black/40 z-50 flex sm:items-stretch sm:justify-end items-end justify-center" @click.self="detalheAg = null">
-      <div class="bg-white w-full sm:max-w-2xl flex flex-col shadow-2xl sm:rounded-none rounded-t-3xl max-h-[92vh] sm:max-h-none sm:h-full">
+      <div class="bg-white w-full sm:max-w-3xl flex flex-col shadow-2xl sm:rounded-none rounded-t-3xl max-h-[92vh] sm:max-h-none sm:h-full">
         <!-- Drag handle (mobile only) — sinal visual de que o painel é deslizável -->
         <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
 
@@ -636,7 +636,7 @@
         <div class="flex flex-1 overflow-hidden">
           <!-- Esquerda: detalhes do agendamento -->
           <!-- sm:block garante visibilidade no desktop. No mobile, controla a tab ativa. -->
-          <div :class="['flex-1 overflow-y-auto p-5 border-r border-gray-100 min-w-0', isMobile && detalheTab !== 'servicos' ? 'hidden' : '']">
+          <div :class="['flex-1 overflow-y-auto p-5 border-r border-gray-100 min-w-0', isPanelMobile && detalheTab !== 'servicos' ? 'hidden' : '']">
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Serviços</h4>
             <div v-if="detalheAgColisoes.length" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
               <p class="text-xs font-semibold text-amber-800">Atenção: este agendamento colide com outro horário.</p>
@@ -727,44 +727,52 @@
             </button>
           </div>
 
-          <!-- Direita: ficha do cliente + histórico -->
-          <div :class="['sm:w-64 w-full flex-shrink-0 overflow-y-auto p-5', isMobile && detalheTab !== 'cliente' ? 'hidden' : '']">
-            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cliente</h4>
-            <div class="bg-gray-50 rounded-xl p-3.5 border border-gray-100 mb-4">
-              <p class="text-sm font-bold text-gray-800">{{ detalheAg.cliente?.nome }}</p>
-              <p v-if="detalheAg.cliente?.telefone" class="text-xs text-gray-500 mt-1">{{ detalheAg.cliente.telefone }}</p>
-              <p v-if="detalheAg.cliente?.observacoes" class="text-xs text-gray-400 mt-1.5 italic">{{ detalheAg.cliente.observacoes }}</p>
-              <p v-if="Number(detalheAg.cliente?.saldo_credito) > 0" class="text-xs font-semibold text-green-700 mt-1">
-                Saldo de crédito: R$ {{ Number(detalheAg.cliente.saldo_credito).toFixed(2) }}
-              </p>
+          <!-- Direita: perfil completo do cliente + histórico -->
+          <div :class="['sm:w-80 w-full flex-shrink-0 overflow-y-auto p-5', isPanelMobile && detalheTab !== 'cliente' ? 'hidden' : '']">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</h4>
               <button
-                class="mt-3 text-xs text-rose-600 font-semibold hover:underline"
-                @click="abrirDrawerCliente(detalheAg.cliente); detalheAg = null"
-              >Ver perfil completo →</button>
+                class="text-xs text-rose-600 font-semibold hover:underline"
+                @click="abrirDrawerCliente(detalheAg.cliente)"
+              >Editar perfil →</button>
             </div>
 
-            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Histórico
-              <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteHistoricoItens.length }})</span>
-            </h4>
-            <div v-if="loadingDetalheClienteHistorico" class="text-xs text-gray-400 py-2">Carregando...</div>
-            <div v-else-if="detalheClienteHistoricoItens.length === 0" class="text-xs text-gray-400 italic">Nenhuma visita.</div>
-            <div
-              v-for="(item, idx) in detalheClienteHistoricoItens.slice(0, 12)"
-              :key="idx"
-              class="mb-2 bg-white rounded-xl px-3 py-2.5 border border-gray-100"
-            >
-              <div class="flex items-start gap-2">
-                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
-                  <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+            <!-- Perfil completo do cliente -->
+            <div class="bg-gray-50 rounded-xl border border-gray-100 mb-4 overflow-hidden">
+              <!-- Dados principais -->
+              <div class="px-4 py-3.5">
+                <p class="text-sm font-bold text-gray-800">{{ detalheAg.cliente?.nome }}</p>
+                <p v-if="detalheAg.cliente?.telefone" class="text-xs text-gray-500 mt-1">{{ detalheAg.cliente.telefone }}</p>
+                <p v-if="detalheAg.cliente?.email" class="text-xs text-gray-500 mt-0.5">{{ detalheAg.cliente.email }}</p>
+                <p v-if="Number(detalheAg.cliente?.saldo_credito) > 0" class="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded-full px-2 py-0.5 mt-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+                  Saldo: R$ {{ Number(detalheAg.cliente.saldo_credito).toFixed(2) }}
+                </p>
+              </div>
+
+              <!-- Notas / Observações com expansão -->
+              <div v-if="detalheAg.cliente?.observacoes" class="px-4 py-3 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Notas</p>
+                <p :class="['text-xs text-gray-600 whitespace-pre-wrap leading-relaxed', !detalheNotasExpanded && 'line-clamp-3']">{{ detalheAg.cliente.observacoes }}</p>
+                <button
+                  v-if="detalheAg.cliente.observacoes.length > 100"
+                  @click="detalheNotasExpanded = !detalheNotasExpanded"
+                  class="mt-1.5 text-xs text-rose-500 font-medium hover:text-rose-700"
+                >{{ detalheNotasExpanded ? '▲ Ver menos' : '▼ Ver mais' }}</button>
+              </div>
+
+              <!-- Campos personalizados -->
+              <div v-if="detalheAg.cliente?.campos_dinamicos?.length" class="px-4 py-3 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Campos personalizados</p>
+                <div v-for="campo in detalheAg.cliente.campos_dinamicos" :key="campo.chave" class="flex gap-1.5 mb-1 text-xs">
+                  <span class="text-gray-400 flex-shrink-0">{{ campo.chave }}:</span>
+                  <span class="text-gray-700">{{ campo.valor }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Próximos Agendamentos -->
-            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-3">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Próximos Agendamentos
               <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteProximosItens.length }})</span>
             </h4>
@@ -777,6 +785,26 @@
             >
               <div class="flex items-start gap-2">
                 <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido' }"></span>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
+                  <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+                </div>
+              </div>
+            </div>
+
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-3">
+              Histórico
+              <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteHistoricoItens.length }})</span>
+            </h4>
+            <div v-if="loadingDetalheClienteHistorico" class="text-xs text-gray-400 py-2">Carregando...</div>
+            <div v-else-if="detalheClienteHistoricoItens.length === 0" class="text-xs text-gray-400 italic">Nenhuma visita.</div>
+            <div
+              v-for="(item, idx) in detalheClienteHistoricoItens.slice(0, 12)"
+              :key="idx"
+              class="mb-2 bg-white rounded-xl px-3 py-2.5 border border-gray-100"
+            >
+              <div class="flex items-start gap-2">
+                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
                 <div class="min-w-0">
                   <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
                   <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
@@ -1003,7 +1031,7 @@
         </div>
         <div class="flex flex-1 overflow-hidden">
           <!-- Esquerda: formulário -->
-          <div :class="['sm:w-72 w-full flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5', isMobile && clienteTab !== 'dados' ? 'hidden' : '']">
+          <div :class="['sm:w-72 w-full flex-shrink-0 overflow-y-auto border-r border-gray-100 p-5', isPanelMobile && clienteTab !== 'dados' ? 'hidden' : '']">
             <form @submit.prevent="salvarCliente" class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Nome</label>
@@ -1046,8 +1074,19 @@
                 </p>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notas do cliente</label>
-                <textarea v-model="formCliente.observacoes" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none"></textarea>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Notas do cliente</label>
+                  <button
+                    type="button"
+                    @click="notasDrawerExpanded = !notasDrawerExpanded"
+                    class="text-xs text-gray-400 hover:text-rose-600 transition-colors"
+                  >{{ notasDrawerExpanded ? '▲ Recolher' : '▼ Expandir' }}</button>
+                </div>
+                <textarea
+                  v-model="formCliente.observacoes"
+                  :rows="notasDrawerExpanded ? 10 : 3"
+                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 resize-y transition-all"
+                ></textarea>
               </div>
               <div>
                 <div class="flex items-center justify-between mb-2">
@@ -1077,7 +1116,7 @@
             </form>
           </div>
           <!-- Direita: próximos agendamentos + histórico -->
-          <div :class="['flex-1 overflow-y-auto p-5', isMobile && clienteTab !== 'historico' ? 'hidden' : '']">
+          <div :class="['flex-1 overflow-y-auto p-5', isPanelMobile && clienteTab !== 'historico' ? 'hidden' : '']">
             <!-- Próximos Agendamentos (exibido diretamente no painel do cliente) -->
             <div class="mb-6">
               <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1361,6 +1400,11 @@ const fetchingRange = ref(false)
 const loadingClientes = ref(false)
 
 const filtroProfissional = ref(null)
+// usuario_id do profissional selecionado no filtro — ponte entre profissional.id e responsavel_id das tarefas
+const filtroProfissionalUsuarioId = computed(() => {
+  if (!filtroProfissional.value) return null
+  return profissionais.value.find(p => p.id === filtroProfissional.value)?.usuario_id ?? null
+})
 const buscaCalendario = ref('')
 const filtroPendentesProximos = ref(false)
 const filtroAgendamentosRecentes = ref(false)
@@ -1407,7 +1451,15 @@ const agendamentosRecentes = computed(() => {
 // Breakpoint ajustado para o menu de ações entrar antes em telas médias.
 const MOBILE_BREAKPOINT = 1100
 const isMobile = ref(window.innerWidth < MOBILE_BREAKPOINT)
-function handleResize() { isMobile.value = window.innerWidth < MOBILE_BREAKPOINT }
+// Breakpoint menor usado nos painéis de detalhe (agendamento + cliente):
+// garante que ambas as colunas ficam visíveis lado a lado mesmo em tela dividida.
+// O Tailwind usa sm=640px para o mesmo efeito no CSS — mantemos consistência aqui.
+const PANEL_BREAKPOINT = 640
+const isPanelMobile = ref(window.innerWidth < PANEL_BREAKPOINT)
+function handleResize() {
+  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
+  isPanelMobile.value = window.innerWidth < PANEL_BREAKPOINT
+}
 onMounted(() => window.addEventListener('resize', handleResize))
 onUnmounted(() => window.removeEventListener('resize', handleResize))
 
@@ -1432,6 +1484,7 @@ const agParaExcluir = ref(null)
 const excluindoAg = ref(false)
 const detalheCorSelecionada = ref('#59C3B9')
 const coresFavoritas = ref([])
+const detalheNotasExpanded = ref(false)
 
 const STATUS_LABELS = {
   pendente:        'Pendente',
@@ -1511,6 +1564,7 @@ const clienteSelecionadoPainel = ref(null)
 const savingCliente = ref(false)
 const erroCliente = ref('')
 const editandoCamposPainel = ref(false)
+const notasDrawerExpanded = ref(false)
 const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [] })
 
 // DDI: separamos DDI e número para exibição; na persistência armazenamos no campo telefone
@@ -1558,8 +1612,8 @@ const buscaCliente = ref('')
 
 // Reseta as tabs ao abrir os painéis (watches colocados APÓS as declarações
 // das refs que observam, para evitar ReferenceError por TDZ)
-watch(detalheAg, (val) => { if (val) detalheTab.value = 'servicos' })
-watch(clienteDrawer, (val) => { if (val) clienteTab.value = 'dados' })
+watch(detalheAg, (val) => { if (val) { detalheTab.value = 'servicos'; detalheNotasExpanded.value = false } })
+watch(clienteDrawer, (val) => { if (val) { clienteTab.value = 'dados'; notasDrawerExpanded.value = false } })
 watch(isMobile, (mobile) => {
   if (!mobile) showMobileMenu.value = false
 })
@@ -1871,8 +1925,17 @@ const TAREFA_COLORS_DONE = { bg: '#f3f4f6', border: '#9ca3af', text: '#6b7280' }
 
 const calendarEventsTarefas = computed(() => {
   const q = buscaCalendario.value.trim().toLowerCase()
+  const profFiltroAtivo = filtroProfissional.value !== null
+  const usuarioFiltro = filtroProfissionalUsuarioId.value
   return tarefas.value
-    .filter(t => !q || t.titulo.toLowerCase().includes(q))
+    .filter(t => {
+      if (profFiltroAtivo) {
+        // Profissional sem usuario_id vinculado → nenhuma tarefa pode ser atribuída a ele
+        if (usuarioFiltro === null) return false
+        if (t.responsavel_id !== usuarioFiltro) return false
+      }
+      return !q || t.titulo.toLowerCase().includes(q)
+    })
     .map(t => {
       const c = t.concluida ? TAREFA_COLORS_DONE : TAREFA_COLORS
       return {
@@ -2560,12 +2623,19 @@ function statusBadgeClass(status) {
 }
 
 // ─── Tarefas Internas ──────────────────────────────────────────────────────
-const colunaTarefasDoDia = computed(() =>
-  tarefas.value.filter(t => {
+const colunaTarefasDoDia = computed(() => {
+  const profFiltroAtivo = filtroProfissional.value !== null
+  const usuarioFiltro = filtroProfissionalUsuarioId.value
+  return tarefas.value.filter(t => {
     const d = t.data_hora_inicio ? formatDateISOInSaoPaulo(new Date(t.data_hora_inicio)) : ''
-    return d === colunaDia.value
+    if (d !== colunaDia.value) return false
+    if (profFiltroAtivo) {
+      if (usuarioFiltro === null) return false
+      if (t.responsavel_id !== usuarioFiltro) return false
+    }
+    return true
   })
-)
+})
 
 function colunaTarefaStyle(t) {
   const startMin = toMinutes(t.data_hora_inicio) - DAY_START_MINUTES
