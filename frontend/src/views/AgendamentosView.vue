@@ -377,28 +377,21 @@
         </div>
       </div>
 
-      <!-- Wrapper com zoom aplicado -->
-      <div 
-        class="flex-1 overflow-auto fc-zoom-wrapper"
-        :style="isMobile ? { '--fc-zoom': calendarZoom } : {}"
-      >
-        <div 
-          class="fc-zoom-content"
+      <!-- Calendário -->
+      <div class="flex-1 relative overflow-hidden">
+        <FullCalendar
+          v-if="!loading"
+          ref="calendarRef"
+          :key="isMobile ? 'fc-m' : 'fc-d'"
+          :options="calendarOptions"
           :style="isMobile && calendarZoom !== 1 ? { 
             transform: `scale(${calendarZoom})`, 
             transformOrigin: 'top left',
             width: `${100 / calendarZoom}%`,
-            minHeight: `${100 / calendarZoom}%`
+            height: `${100 / calendarZoom}%`
           } : {}"
-        >
-          <FullCalendar
-            v-if="!loading"
-            ref="calendarRef"
-            :key="isMobile ? 'fc-m' : 'fc-d'"
-            :options="calendarOptions"
-          />
-          <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
-        </div>
+        />
+        <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
       </div>
     </div>
 
@@ -4021,16 +4014,6 @@ onActivated(() => {
 @keyframes sgk-tooltip-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ── Zoom wrapper para mobile ── */
-.fc-zoom-wrapper {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-}
-.fc-zoom-content {
-  min-height: 100%;
-  transition: transform 0.15s ease;
 }
 
 /* ── Mobile-specific improvements ── */
