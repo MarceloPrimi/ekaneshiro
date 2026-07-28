@@ -298,38 +298,76 @@ def editar_pagamento(
     "/{agendamento_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Excluir agendamento",
+    description=(
+        "Exclui um agendamento. Para séries recorrentes, use delete_scope para controlar "
+        "se exclui apenas este (this), todos os futuros (future), ou toda a série (all)."
+    ),
 )
 def excluir_agendamento(
     agendamento_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
     force: bool = False,
+    delete_scope: str = "this",
 ):
-    from db.models import ItemComanda
+    from db.models import ItemComanda, Agendamento
+    from datetime import datetime
     
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
     _verificar_acesso_profissional(current_user, agendamento)
     
-    # Verifica se algum item do agendamento está em uma comanda
-    itens_em_comanda = (
-        db.query(ItemComanda)
-        .filter(ItemComanda.agendamento_id == agendamento_id)
-        .all()
-    )
+    agendamentos_para_excluir = [agendamento]
     
-    if itens_em_comanda and not force:
-        comanda_ids = set(ic.comanda_id for ic in itens_em_comanda)
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Este agendamento está vinculado a comanda(s) #{', #'.join(map(str, comanda_ids))}. "
-                   f"Cancele ou feche a(s) comanda(s) primeiro, ou use force=true para desvincular.",
+    is_parent = agendamento.recurrence_rule is not None
+    is_child = agendamento.parent_id is not None
+    
+    if delete_scope == "all":
+        if is_child:
+            pai = db.query(Agendamento).filter(Agendamento.id == agendamento.parent_id).first()
+            if pai:
+                filhos = db.query(Agendamento).filter(Agendamento.parent_id == pai.id).all()
+                agendamentos_para_excluir = [pai] + filhos
+        elif is_parent:
+            filhos = db.query(Agendamento).filter(Agendamento.parent_id == agendamento.id).all()
+            agendamentos_para_excluir = [agendamento] + filhos
+    elif delete_scope == "future":
+        data_referencia = agendamento.itens[0].data_hora_inicio if agendamento.itens else datetime.now()
+        if is_child:
+            pai = db.query(Agendamento).filter(Agendamento.id == agendamento.parent_id).first()
+            if pai:
+                filhos = db.query(Agendamento).filter(Agendamento.parent_id == pai.id).all()
+                for filho in filhos:
+                    data_filho = filho.itens[0].data_hora_inicio if filho.itens else None
+                    if data_filho and data_filho >= data_referencia:
+                        agendamentos_para_excluir.append(filho)
+        elif is_parent:
+            filhos = db.query(Agendamento).filter(Agendamento.parent_id == agendamento.id).all()
+            for filho in filhos:
+                data_filho = filho.itens[0].data_hora_inicio if filho.itens else None
+                if data_filho and data_filho >= data_referencia:
+                    agendamentos_para_excluir.append(filho)
+    
+    for ag in agendamentos_para_excluir:
+        itens_em_comanda = (
+            db.query(ItemComanda)
+            .filter(ItemComanda.agendamento_id == ag.id)
+            .all()
         )
+        
+        if itens_em_comanda and not force:
+            comanda_ids = set(ic.comanda_id for ic in itens_em_comanda)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Agendamento #{ag.id} está vinculado a comanda(s) #{', #'.join(map(str, comanda_ids))}. "
+                       f"Cancele ou feche a(s) comanda(s) primeiro, ou use force=true para desvincular.",
+            )
+        
+        if itens_em_comanda and force:
+            for item in itens_em_comanda:
+                item.agendamento_id = None
+                item.item_agendamento_id = None
     
-    # Se force=true, desvincula os itens da comanda
-    if itens_em_comanda and force:
-        for item in itens_em_comanda:
-            item.agendamento_id = None
-            item.item_agendamento_id = None
+    for ag in agendamentos_para_excluir:
+        db.delete(ag)
     
-    db.delete(agendamento)
     db.commit()

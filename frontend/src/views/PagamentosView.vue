@@ -35,37 +35,58 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════════════
-         SEÇÃO 1: COMANDAS ABERTAS
+         SEÇÃO 1: COMANDAS
          ═══════════════════════════════════════════════════════════════════════════ -->
     <div class="mb-8">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div class="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
-          <h3 class="text-lg font-bold text-gray-800">Comandas Abertas</h3>
-          <span v-if="comandasAbertas.length" class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ comandasAbertas.length }}</span>
+          <h3 class="text-lg font-bold text-gray-800">Comandas</h3>
+          <span v-if="comandasFiltradas.length" class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ comandasFiltradas.length }}</span>
         </div>
-        <button @click="fetchComandas" class="text-xs text-gray-400 hover:text-gray-600">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-        </button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input 
+            v-model="filtroComandaData" 
+            type="date" 
+            class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-400"
+          />
+          <select 
+            v-model="filtroComandaStatus" 
+            class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-400"
+          >
+            <option value="">Todos</option>
+            <option value="pendente">Pendentes</option>
+            <option value="pago">Pagos</option>
+          </select>
+          <button @click="fetchComandas" class="text-xs text-gray-400 hover:text-gray-600 p-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+        </div>
       </div>
       
       <div v-if="loadingComandas" class="text-sm text-gray-400 p-4">Carregando comandas...</div>
-      <div v-else-if="comandasAbertas.length === 0" class="bg-gray-50 rounded-xl border border-gray-100 p-6 text-center text-sm text-gray-400">
-        Nenhuma comanda aberta no momento.
+      <div v-else-if="comandasFiltradas.length === 0" class="bg-gray-50 rounded-xl border border-gray-100 p-6 text-center text-sm text-gray-400">
+        Nenhuma comanda encontrada para o filtro selecionado.
       </div>
       <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div 
-          v-for="c in comandasAbertas" 
+          v-for="c in comandasFiltradas" 
           :key="c.id" 
           @click="abrirComanda(c)"
           class="bg-white border border-gray-200 rounded-xl p-4 hover:border-rose-300 hover:shadow-md cursor-pointer transition-all"
         >
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-bold text-rose-600">#{{ String(c.id).padStart(4, '0') }}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-rose-600">#{{ String(c.id).padStart(4, '0') }}</span>
+              <span 
+                :class="c.status === 'fechada' ? 'bg-green-100 text-green-700' : c.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'"
+                class="text-xs font-medium px-1.5 py-0.5 rounded"
+              >{{ c.status === 'fechada' ? 'Fechada' : c.status === 'cancelada' ? 'Cancelada' : 'Aberta' }}</span>
+            </div>
             <span class="text-xs text-gray-400">{{ formatDateShort(c.aberta_em) }}</span>
           </div>
           <div class="space-y-1 mb-3">
@@ -279,6 +300,10 @@ const loadingComandas = ref(false)
 const comanda = ref(null)
 const abrindoComanda = ref(null)
 
+// ── Filtros de Comandas ────────────────────────────────────────────────────────
+const filtroComandaData = ref(hoje)
+const filtroComandaStatus = ref('pendente')
+
 // ── Editar pagamento (legado) ─────────────────────────────────────────────────
 const modalEditarAberto = ref(false)
 const agEditarSelecionado = ref(null)
@@ -288,9 +313,7 @@ const formEditar = ref({ valor: '', credito_utilizado: '0.00', metodo: '' })
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 
-const comandasAbertas = computed(() => 
-  comandas.value.filter(c => c.status === 'aberta')
-)
+const comandasFiltradas = computed(() => comandas.value)
 
 const pagamentosPendentes = computed(() =>
   agendamentos.value.filter(ag => 
@@ -328,7 +351,15 @@ async function fetchAgendamentos() {
 async function fetchComandas() {
   loadingComandas.value = true
   try {
-    const { data } = await api.get('/comandas/?status_filtro=aberta')
+    const params = new URLSearchParams()
+    if (filtroComandaData.value) {
+      params.append('data_inicio', filtroComandaData.value)
+      params.append('data_fim', filtroComandaData.value)
+    }
+    if (filtroComandaStatus.value) {
+      params.append('pago_filtro', filtroComandaStatus.value)
+    }
+    const { data } = await api.get(`/comandas/?${params.toString()}`)
     comandas.value = data
   } finally {
     loadingComandas.value = false
@@ -339,6 +370,12 @@ let _debounce
 watch([filtroDe, filtroAte], () => {
   clearTimeout(_debounce)
   _debounce = setTimeout(fetchAgendamentos, 250)
+})
+
+let _debounceComandas
+watch([filtroComandaData, filtroComandaStatus], () => {
+  clearTimeout(_debounceComandas)
+  _debounceComandas = setTimeout(fetchComandas, 250)
 })
 
 // ── Abrir comanda ─────────────────────────────────────────────────────────────

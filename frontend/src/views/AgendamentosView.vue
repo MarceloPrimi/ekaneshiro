@@ -671,18 +671,40 @@
               <p v-if="detalheAg.cliente?.observacoes" class="text-xs text-gray-500 mt-2 line-clamp-2 italic">{{ detalheAg.cliente.observacoes }}</p>
             </div>
 
-            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Serviços</h4>
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Serviços
+              <span v-if="temOutrosServicosNoDia" class="text-green-600 font-normal normal-case ml-1">★ Múltiplos profissionais no dia</span>
+            </h4>
             <div v-if="detalheAgColisoes.length" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
               <p class="text-xs font-semibold text-amber-800">Atenção: este agendamento colide com outro horário.</p>
               <p class="text-xs text-amber-700 mt-0.5">{{ detalheAgColisoes[0] }}</p>
             </div>
             <div class="space-y-2 mb-5">
-              <div v-for="item in detalheAg.itens" :key="item.id" class="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+              <div v-for="item in todosServicosClienteNoDia.itensAgAtual" :key="'atual-'+item.id" class="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <div class="flex items-center gap-2 mb-0.5">
                   <span class="text-sm font-semibold text-gray-800">{{ item.servico?.nome }}</span>
                 </div>
                 <div class="text-xs text-gray-500">{{ item.profissional?.nome }}</div>
                 <div class="text-xs text-gray-400 mt-0.5">{{ formatDate(item.data_hora_inicio) }}<span v-if="item.data_hora_fim"> → {{ formatHoraCliente(item.data_hora_fim) }}</span></div>
+              </div>
+              
+              <div v-if="temOutrosServicosNoDia" class="pt-2">
+                <p class="text-xs font-semibold text-green-700 mb-2 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  Outros serviços no mesmo dia
+                </p>
+                <div class="space-y-2">
+                  <div v-for="item in todosServicosClienteNoDia.itensOutrosAg" :key="'outro-'+item.id" class="bg-green-50 rounded-xl px-4 py-3 border border-green-100">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <span class="text-sm font-semibold text-gray-800">{{ item.servico?.nome }}</span>
+                      <span class="text-xs text-green-600 font-medium">#{{ item.agendamentoId }}</span>
+                    </div>
+                    <div class="text-xs text-gray-500">{{ item.profissional?.nome }}</div>
+                    <div class="text-xs text-gray-400 mt-0.5">{{ formatDate(item.data_hora_inicio) }}<span v-if="item.data_hora_fim"> → {{ formatHoraCliente(item.data_hora_fim) }}</span></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -863,12 +885,43 @@
         <p class="text-sm text-gray-700 mb-1">Excluir agendamento</p>
         <p class="font-semibold text-gray-900 mb-4">{{ agParaExcluir.cliente?.nome }}</p>
         
+        <!-- Opções de escopo para agendamentos recorrentes -->
+        <div v-if="agParaExcluir.recurrence_rule || agParaExcluir.parent_id" class="mb-4">
+          <p class="text-xs text-gray-500 mb-3">Este agendamento faz parte de uma série recorrente.</p>
+          <div class="space-y-2 text-left">
+            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="deleteScopeAg === 'this' ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+              <input type="radio" v-model="deleteScopeAg" value="this" class="text-red-600 focus:ring-red-500" />
+              <div>
+                <span class="text-sm font-medium text-gray-800">Apenas este</span>
+                <p class="text-xs text-gray-500">Exclui somente este agendamento</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="deleteScopeAg === 'future' ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+              <input type="radio" v-model="deleteScopeAg" value="future" class="text-red-600 focus:ring-red-500" />
+              <div>
+                <span class="text-sm font-medium text-gray-800">Este e futuros</span>
+                <p class="text-xs text-gray-500">Exclui este e todos os próximos da série</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="deleteScopeAg === 'all' ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+              <input type="radio" v-model="deleteScopeAg" value="all" class="text-red-600 focus:ring-red-500" />
+              <div>
+                <span class="text-sm font-medium text-gray-800">Toda a série</span>
+                <p class="text-xs text-gray-500">Exclui todos os agendamentos da série</p>
+              </div>
+            </label>
+          </div>
+        </div>
+        
         <!-- Mensagem de erro quando há comanda vinculada -->
         <div v-if="erroExcluirAg" class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-left">
           <p class="text-xs text-amber-800 font-medium mb-2">{{ erroExcluirAg }}</p>
           <p class="text-xs text-amber-600">Deseja desvincular da comanda e excluir mesmo assim?</p>
         </div>
-        <p v-else class="text-xs text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+        <p v-else-if="!agParaExcluir.recurrence_rule && !agParaExcluir.parent_id" class="text-xs text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
         
         <div class="flex gap-2">
           <button @click="agParaExcluir = null; erroExcluirAg = ''" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
@@ -886,7 +939,7 @@
             :disabled="excluindoAg" 
             class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60"
           >
-            {{ excluindoAg ? 'Excluindo...' : 'Excluir' }}
+            {{ excluindoAg ? 'Excluindo...' : deleteScopeAg === 'all' ? 'Excluir série' : deleteScopeAg === 'future' ? 'Excluir futuros' : 'Excluir' }}
           </button>
         </div>
       </div>
@@ -1566,6 +1619,7 @@ const detalheAg = ref(null)
 const agParaExcluir = ref(null)
 const excluindoAg = ref(false)
 const erroExcluirAg = ref('')
+const deleteScopeAg = ref('this')
 const detalheCorSelecionada = ref('#59C3B9')
 const coresFavoritas = ref([])
 const detalheNotasExpanded = ref(false)
@@ -1825,6 +1879,49 @@ const detalheAgColisoes = computed(() => {
 
   return conflitos
 })
+
+const todosServicosClienteNoDia = computed(() => {
+  const ag = detalheAg.value
+  if (!ag) return { itensAgAtual: [], itensOutrosAg: [] }
+
+  const dataRef = ag.itens?.[0]?.data_hora_inicio
+  if (!dataRef) return { itensAgAtual: ag.itens ?? [], itensOutrosAg: [] }
+  
+  const dataStr = new Date(dataRef).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+  const clienteId = ag.cliente_id
+
+  const itensAgAtual = (ag.itens ?? []).map(item => ({
+    ...item,
+    agendamentoId: ag.id,
+    isAgAtual: true,
+  }))
+
+  const itensOutrosAg = []
+  for (const outro of agendamentos.value) {
+    if (outro.id === ag.id) continue
+    if (outro.cliente_id !== clienteId) continue
+    if (outro.status === 'cancelado') continue
+    
+    const dataOutro = outro.itens?.[0]?.data_hora_inicio
+    if (!dataOutro) continue
+    const dataOutroStr = new Date(dataOutro).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    if (dataOutroStr !== dataStr) continue
+    
+    for (const item of outro.itens ?? []) {
+      itensOutrosAg.push({
+        ...item,
+        agendamentoId: outro.id,
+        isAgAtual: false,
+      })
+    }
+  }
+  
+  itensOutrosAg.sort((a, b) => new Date(a.data_hora_inicio) - new Date(b.data_hora_inicio))
+
+  return { itensAgAtual, itensOutrosAg }
+})
+
+const temOutrosServicosNoDia = computed(() => todosServicosClienteNoDia.value.itensOutrosAg.length > 0)
 watch(detalheAg, (ag) => {
   if (ag?.cliente?.id) {
     loadingDetalheClienteHistorico.value = true
@@ -2284,13 +2381,30 @@ function renderEventContent(arg) {
   const flagColor = STATUS_FLAG_COLOR[ag?.status] ?? '#9ca3af'
   const flag = `<span class="fc-ev-flag" style="border-top-color:${flagColor}" title="${ag?.status ?? ''}"></span>`
   
-  // Verifica se o cliente tem múltiplos profissionais ou serviços neste dia
-  const temMultiplosProfissionais = (ag?.itens ?? []).length > 1 && 
-    new Set((ag?.itens ?? []).map(i => i.profissional_id)).size > 1
-  const temMultiplosServicos = (ag?.itens ?? []).length > 1
-  const mostrarEstrela = temMultiplosProfissionais || temMultiplosServicos
+  // Verifica se o cliente tem 2+ profissionais DIFERENTES no mesmo dia (em todos os agendamentos do dia)
+  const dataEvt = arg.event.start 
+    ? arg.event.start.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    : null
+  const cliId = ag?.cliente_id
+  let mostrarEstrela = false
+  if (dataEvt && cliId && agendamentos.value) {
+    const todosAgClienteNoDia = agendamentos.value.filter(outro => {
+      if (outro.cliente_id !== cliId) return false
+      const dataOutro = outro.itens?.[0]?.data_hora_inicio
+      if (!dataOutro) return false
+      const dataOutroStr = new Date(dataOutro).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      return dataOutroStr === dataEvt
+    })
+    const todosProfissionaisNoDia = new Set()
+    for (const agCliente of todosAgClienteNoDia) {
+      for (const item of agCliente.itens ?? []) {
+        if (item.profissional_id) todosProfissionaisNoDia.add(item.profissional_id)
+      }
+    }
+    mostrarEstrela = todosProfissionaisNoDia.size >= 2
+  }
   const estrela = mostrarEstrela 
-    ? `<span class="fc-ev-star" style="color:#15803d" title="Múltiplos serviços/profissionais">★</span>` 
+    ? `<span class="fc-ev-star" style="color:#15803d" title="Múltiplos profissionais no dia">★</span>` 
     : ''
 
   const firstName = (s) => s ? s.split(' ')[0] : ''
@@ -3095,6 +3209,7 @@ function alterarStatus(id, novoStatus) {
 function confirmarExcluirAg(ag) {
   agParaExcluir.value = ag
   erroExcluirAg.value = ''
+  deleteScopeAg.value = 'this'
   detalheAg.value = null
 }
 
@@ -3103,17 +3218,42 @@ async function excluirAgendamento(forceDesvincular = false) {
   excluindoAg.value = true
   erroExcluirAg.value = ''
   const id = agParaExcluir.value.id
+  const scope = deleteScopeAg.value
   try {
-    const url = forceDesvincular ? `/agendamentos/${id}?force=true` : `/agendamentos/${id}`
+    const params = new URLSearchParams()
+    if (forceDesvincular) params.append('force', 'true')
+    if (scope !== 'this') params.append('delete_scope', scope)
+    const url = `/agendamentos/${id}${params.toString() ? '?' + params.toString() : ''}`
     await api.delete(url)
-    // Remove localmente sem refetch completo — mantém a view atual do calendário
-    agendamentos.value = agendamentos.value.filter(a => a.id !== id)
+    
+    if (scope === 'all') {
+      const parentId = agParaExcluir.value.parent_id || id
+      agendamentos.value = agendamentos.value.filter(a => 
+        a.id !== id && a.parent_id !== parentId && a.id !== parentId
+      )
+      toastSucesso('Série de agendamentos excluída.')
+    } else if (scope === 'future') {
+      const dataRef = agParaExcluir.value.itens?.[0]?.data_hora_inicio
+      if (dataRef) {
+        const parentId = agParaExcluir.value.parent_id || id
+        agendamentos.value = agendamentos.value.filter(a => {
+          if (a.id === id) return false
+          if (a.parent_id === parentId || a.id === parentId) {
+            const dataAg = a.itens?.[0]?.data_hora_inicio
+            return dataAg && new Date(dataAg) < new Date(dataRef)
+          }
+          return true
+        })
+      }
+      toastSucesso('Agendamentos futuros excluídos.')
+    } else {
+      agendamentos.value = agendamentos.value.filter(a => a.id !== id)
+      toastSucesso('Agendamento excluído.')
+    }
     agParaExcluir.value = null
     detalheAg.value = null
-    toastSucesso('Agendamento excluído.')
   } catch (e) {
     const detail = e.response?.data?.detail || 'Erro ao excluir agendamento.'
-    // Se o erro é de conflito com comanda, mostra opção de forçar
     if (e.response?.status === 409 && detail.includes('comanda')) {
       erroExcluirAg.value = detail
     } else {

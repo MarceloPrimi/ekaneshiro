@@ -74,16 +74,59 @@ def abrir_comanda(
     "/",
     response_model=list[ComandaResponse],
     summary="Listar comandas",
+    description=(
+        "Lista comandas com filtros opcionais por status, data e situação de pagamento. "
+        "Use pago_filtro para filtrar por comandas pagas (total_pago >= total_itens) ou pendentes."
+    ),
 )
 def listar_comandas(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
     status_filtro: StatusComandaEnum | None = None,
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
+    pago_filtro: str | None = None,
 ):
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+    
     query = db.query(Comanda).options(*_EAGER_COMANDA)
+    
     if status_filtro:
         query = query.filter(Comanda.status == status_filtro)
+    
+    if data_inicio:
+        try:
+            dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(Comanda.aberta_em >= dt_inicio)
+        except ValueError:
+            pass
+    
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(Comanda.aberta_em < dt_fim)
+        except ValueError:
+            pass
+    
     comandas = query.order_by(Comanda.aberta_em.desc()).all()
+    
+    if pago_filtro:
+        resultado = []
+        for c in comandas:
+            total_itens = sum(
+                Decimal(str(i.valor_unitario)) * i.quantidade - Decimal(str(i.desconto))
+                for i in c.itens
+            )
+            total_pago = sum(Decimal(str(p.valor)) for p in c.pagamentos)
+            is_pago = total_pago >= total_itens and total_itens > 0
+            
+            if pago_filtro == "pago" and is_pago:
+                resultado.append(c)
+            elif pago_filtro == "pendente" and not is_pago:
+                resultado.append(c)
+        comandas = resultado
+    
     return [_to_response(c) for c in comandas]
 
 
