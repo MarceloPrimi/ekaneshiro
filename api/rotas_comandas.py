@@ -119,12 +119,23 @@ def listar_comandas(
                 for i in c.itens
             )
             total_pago = sum(Decimal(str(p.valor)) for p in c.pagamentos)
-            is_pago = total_pago >= total_itens and total_itens > 0
             
-            if pago_filtro == "pago" and is_pago:
-                resultado.append(c)
-            elif pago_filtro == "pendente" and not is_pago:
-                resultado.append(c)
+            if pago_filtro == "pago":
+                # Pago: comanda fechada OU (aberta com pagamento completo e itens > 0)
+                is_pago = (
+                    c.status == StatusComandaEnum.fechada or
+                    (total_itens > 0 and total_pago >= total_itens)
+                )
+                if is_pago:
+                    resultado.append(c)
+            elif pago_filtro == "pendente":
+                # Pendente: comanda aberta com saldo a pagar ou sem itens ainda
+                is_pendente = (
+                    c.status == StatusComandaEnum.aberta and
+                    (total_itens == 0 or total_pago < total_itens)
+                )
+                if is_pendente:
+                    resultado.append(c)
         comandas = resultado
     
     return [_to_response(c) for c in comandas]

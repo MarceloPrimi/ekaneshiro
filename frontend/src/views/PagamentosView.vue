@@ -103,7 +103,9 @@
               <span class="text-gray-500">Total:</span>
               <span class="font-bold text-gray-800 ml-1">R$ {{ fmt(c.total_itens) }}</span>
             </div>
-            <div v-if="Number(c.saldo_restante) > 0" class="text-xs">
+            <div v-if="c.status === 'cancelada'" class="text-xs text-gray-400">—</div>
+            <div v-else-if="Number(c.total_itens) === 0" class="text-xs text-gray-400 italic">Sem itens</div>
+            <div v-else-if="Number(c.saldo_restante) > 0" class="text-xs">
               <span class="text-amber-600 font-semibold">Falta: R$ {{ fmt(c.saldo_restante) }}</span>
             </div>
             <div v-else class="text-xs text-green-600 font-semibold">Pago ✓</div>
