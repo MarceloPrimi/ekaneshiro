@@ -550,16 +550,23 @@
               <option value="biweekly">Quinzenal</option>
               <option value="monthly">Mensal</option>
             </select>
-            <!-- Quantidade de repetições -->
-            <div v-if="formData.recurrence" class="mt-2 flex items-center gap-2">
-              <span class="text-sm text-gray-600 whitespace-nowrap">Repetir por</span>
-              <input
-                type="number" v-model.number="formData.recurrence_count"
-                min="1" max="104"
-                :placeholder="formData.recurrence === 'monthly' ? '6' : '12'"
-                class="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-rose-400"
-              />
-              <span class="text-sm text-gray-600">{{ formData.recurrence === 'monthly' ? 'meses' : 'semanas' }}</span>
+            <!-- Quantidade de repetições e data de término -->
+            <div v-if="formData.recurrence" class="mt-2 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 whitespace-nowrap">Repetir por</span>
+                <input
+                  type="number" v-model.number="formData.recurrence_count"
+                  min="1" max="104"
+                  :placeholder="formData.recurrence === 'monthly' ? '6' : '12'"
+                  class="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-rose-400"
+                />
+                <span class="text-sm text-gray-600">{{ formData.recurrence === 'monthly' ? 'meses' : 'semanas' }}</span>
+              </div>
+              <!-- Preview da data de término -->
+              <div v-if="dataTerminoRecorrencia" class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                <span class="text-xs text-indigo-600 font-medium">Último agendamento:</span>
+                <span class="text-xs text-indigo-800 ml-1 capitalize">{{ dataTerminoRecorrencia }}</span>
+              </div>
             </div>
           </div>
 
@@ -796,23 +803,27 @@
               </div>
             </div>
 
-            <!-- Próximos Agendamentos -->
+            <!-- Próximos Agendamentos (agrupados por data) -->
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Próximos Agendamentos
               <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteProximosItens.length }})</span>
             </h4>
             <div v-if="loadingDetalheClienteHistorico" class="text-xs text-gray-400 py-2">Carregando...</div>
-            <div v-else-if="detalheClienteProximosItens.length === 0" class="text-xs text-gray-400 italic">Nenhum próximo agendamento.</div>
+            <div v-else-if="detalheClienteProximosAgrupado.length === 0" class="text-xs text-gray-400 italic">Nenhum próximo agendamento.</div>
             <div
-              v-for="(item, idx) in detalheClienteProximosItens.slice(0, 8)"
-              :key="'prox-' + idx"
-              class="mb-2 bg-indigo-50/60 rounded-xl px-3 py-2.5 border border-indigo-100"
+              v-for="grupo in detalheClienteProximosAgrupado.slice(0, 5)"
+              :key="'prox-' + grupo.data"
+              class="mb-3 bg-indigo-50/60 rounded-xl px-3 py-2.5 border border-indigo-100"
             >
-              <div class="flex items-start gap-2">
-                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido' }"></span>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
-                  <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+              <div class="flex items-center gap-2 mb-2 pb-1.5 border-b border-indigo-100">
+                <span class="text-xs font-bold text-indigo-700">{{ grupo.data }}</span>
+                <span class="text-xs text-indigo-500 capitalize">{{ grupo.diaSemana }}</span>
+              </div>
+              <div class="space-y-1.5">
+                <div v-for="(item, idx) in grupo.itens" :key="idx" class="flex items-center gap-2">
+                  <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full" :class="{ 'bg-red-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido' }"></span>
+                  <span class="text-xs font-medium text-gray-800">{{ item.servico?.nome }}</span>
+                  <span class="text-xs text-gray-400">{{ formatHoraCliente(item.data_hora_inicio) }}</span>
                 </div>
               </div>
             </div>
@@ -822,17 +833,21 @@
               <span v-if="!loadingDetalheClienteHistorico" class="font-normal text-gray-400 normal-case">({{ detalheClienteHistoricoItens.length }})</span>
             </h4>
             <div v-if="loadingDetalheClienteHistorico" class="text-xs text-gray-400 py-2">Carregando...</div>
-            <div v-else-if="detalheClienteHistoricoItens.length === 0" class="text-xs text-gray-400 italic">Nenhuma visita.</div>
+            <div v-else-if="detalheClienteHistoricoAgrupado.length === 0" class="text-xs text-gray-400 italic">Nenhuma visita.</div>
             <div
-              v-for="(item, idx) in detalheClienteHistoricoItens.slice(0, 12)"
-              :key="idx"
-              class="mb-2 bg-white rounded-xl px-3 py-2.5 border border-gray-100"
+              v-for="grupo in detalheClienteHistoricoAgrupado.slice(0, 8)"
+              :key="'hist-' + grupo.data"
+              class="mb-3 bg-white rounded-xl px-3 py-2.5 border border-gray-100"
             >
-              <div class="flex items-start gap-2">
-                <span class="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" :class="{ 'bg-gray-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-gray-800 truncate">{{ item.servico?.nome }}</p>
-                  <p class="text-xs text-gray-400">{{ formatDataCliente(item.data_hora_inicio) }} · {{ formatHoraCliente(item.data_hora_inicio) }}</p>
+              <div class="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
+                <span class="text-xs font-bold text-gray-700">{{ grupo.data }}</span>
+                <span class="text-xs text-gray-400 capitalize">{{ grupo.diaSemana }}</span>
+              </div>
+              <div class="space-y-1.5">
+                <div v-for="(item, idx) in grupo.itens" :key="idx" class="flex items-center gap-2">
+                  <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full" :class="{ 'bg-red-600': item.agStatus==='pendente', 'bg-green-700': item.agStatus==='confirmado', 'bg-blue-700': item.agStatus==='concluido', 'bg-red-700': item.agStatus==='pre_agendamento' || item.agStatus==='cancelado' }"></span>
+                  <span class="text-xs font-medium text-gray-800">{{ item.servico?.nome }}</span>
+                  <span class="text-xs text-gray-400">{{ formatHoraCliente(item.data_hora_inicio) }}</span>
                 </div>
               </div>
             </div>
@@ -843,14 +858,34 @@
 
     <!-- Modal Confirmar Exclusão de Agendamento -->
     <div v-if="agParaExcluir" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4">
-      <div class="bg-white w-full sm:max-w-xs sm:rounded-xl rounded-t-3xl shadow-xl p-6 text-center">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl p-6 text-center">
         <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <p class="text-sm text-gray-700 mb-1">Excluir agendamento</p>
         <p class="font-semibold text-gray-900 mb-4">{{ agParaExcluir.cliente?.nome }}</p>
-        <p class="text-xs text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+        
+        <!-- Mensagem de erro quando há comanda vinculada -->
+        <div v-if="erroExcluirAg" class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-left">
+          <p class="text-xs text-amber-800 font-medium mb-2">{{ erroExcluirAg }}</p>
+          <p class="text-xs text-amber-600">Deseja desvincular da comanda e excluir mesmo assim?</p>
+        </div>
+        <p v-else class="text-xs text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+        
         <div class="flex gap-2">
-          <button @click="agParaExcluir = null" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
-          <button @click="excluirAgendamento" :disabled="excluindoAg" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60">
+          <button @click="agParaExcluir = null; erroExcluirAg = ''" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm hover:bg-gray-50">Cancelar</button>
+          <button 
+            v-if="erroExcluirAg"
+            @click="excluirAgendamento(true)" 
+            :disabled="excluindoAg" 
+            class="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60"
+          >
+            {{ excluindoAg ? 'Excluindo...' : 'Desvincular e Excluir' }}
+          </button>
+          <button 
+            v-else
+            @click="excluirAgendamento(false)" 
+            :disabled="excluindoAg" 
+            class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg py-2.5 disabled:opacity-60"
+          >
             {{ excluindoAg ? 'Excluindo...' : 'Excluir' }}
           </button>
         </div>
@@ -1530,6 +1565,7 @@ const modalError = ref('')
 const detalheAg = ref(null)
 const agParaExcluir = ref(null)
 const excluindoAg = ref(false)
+const erroExcluirAg = ref('')
 const detalheCorSelecionada = ref('#59C3B9')
 const coresFavoritas = ref([])
 const detalheNotasExpanded = ref(false)
@@ -1579,6 +1615,40 @@ const basePagAg = ref('0.00')
 const formPagAg = ref({ valor: '', desconto: '0.00', credito_utilizado: '0.00', metodo: '', novoStatus: '' })
 const formData = ref({ id: null, cliente_id: '', cor_hex: null, observacoes: '', itens: [],
   recurrence: null, recurrence_count: null, edit_scope: 'this', parent_id: null })
+
+// Computed para mostrar a data de término da recorrência
+const dataTerminoRecorrencia = computed(() => {
+  if (!formData.value.recurrence || !formData.value.recurrence_count) return null
+  const dataInicio = formData.value.itens?.[0]?.data_hora_inicio
+  if (!dataInicio) return null
+  
+  const dataBase = new Date(dataInicio)
+  const count = formData.value.recurrence_count
+  let dataFinal
+  
+  switch (formData.value.recurrence) {
+    case 'weekly':
+      dataFinal = new Date(dataBase.getTime() + (count - 1) * 7 * 24 * 60 * 60 * 1000)
+      break
+    case 'biweekly':
+      dataFinal = new Date(dataBase.getTime() + (count - 1) * 14 * 24 * 60 * 60 * 1000)
+      break
+    case 'monthly':
+      dataFinal = new Date(dataBase)
+      dataFinal.setMonth(dataFinal.getMonth() + count - 1)
+      break
+    default:
+      return null
+  }
+  
+  return dataFinal.toLocaleDateString('pt-BR', { 
+    weekday: 'long',
+    day: '2-digit', 
+    month: 'long', 
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo' 
+  })
+})
 
 // Decision modal — abre ao clicar na célula do calendário
 const decisionModal = ref({ show: false, dataHora: null, posX: 0, posY: 0 })
@@ -1669,6 +1739,25 @@ watch(isMobile, (mobile) => {
 // Detalhe panel: histórico separado para não conflitar com o drawer de clientes
 const detalheClienteHistorico = ref([])
 const loadingDetalheClienteHistorico = ref(false)
+
+// Agrupa itens por data (dd/mm/yyyy) para exibição mais limpa
+function agruparPorData(items) {
+  const grupos = new Map()
+  for (const item of items) {
+    const dataStr = formatDataCliente(item.data_hora_inicio)
+    if (!grupos.has(dataStr)) {
+      grupos.set(dataStr, {
+        data: dataStr,
+        dataObj: new Date(item.data_hora_inicio),
+        diaSemana: diaSemanaCliente(item.data_hora_inicio),
+        itens: []
+      })
+    }
+    grupos.get(dataStr).itens.push(item)
+  }
+  return Array.from(grupos.values())
+}
+
 const detalheClienteHistoricoItens = computed(() => {
   const agora = new Date()
   const items = []
@@ -1680,6 +1769,12 @@ const detalheClienteHistoricoItens = computed(() => {
     }
   }
   return items.sort((a, b) => new Date(b.data_hora_inicio) - new Date(a.data_hora_inicio))
+})
+
+// Versão agrupada por data do histórico
+const detalheClienteHistoricoAgrupado = computed(() => {
+  const grupos = agruparPorData(detalheClienteHistoricoItens.value)
+  return grupos.sort((a, b) => b.dataObj - a.dataObj)
 })
 
 const detalheClienteProximosItens = computed(() => {
@@ -1695,6 +1790,12 @@ const detalheClienteProximosItens = computed(() => {
     }
   }
   return items.sort((a, b) => new Date(a.data_hora_inicio) - new Date(b.data_hora_inicio))
+})
+
+// Versão agrupada por data dos próximos
+const detalheClienteProximosAgrupado = computed(() => {
+  const grupos = agruparPorData(detalheClienteProximosItens.value)
+  return grupos.sort((a, b) => a.dataObj - b.dataObj)
 })
 
 const detalheAgColisoes = computed(() => {
@@ -2216,12 +2317,39 @@ function renderEventContent(arg) {
     return `• ${servItem}${profItem ? ` (${profItem})` : ''}${hItem ? ` – ${hItem}` : ''}`
   }).join('\n')
 
+  // Busca outros agendamentos do mesmo cliente no mesmo dia
+  const dataEvento = arg.event.start 
+    ? arg.event.start.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    : null
+  const clienteId = ag?.cliente_id
+  let outrosAgNoDia = ''
+  if (dataEvento && clienteId && agendamentos.value) {
+    const outrosAg = agendamentos.value.filter(outro => {
+      if (outro.id === ag?.id) return false
+      if (outro.cliente_id !== clienteId) return false
+      const dataOutro = outro.itens?.[0]?.data_hora_inicio
+      if (!dataOutro) return false
+      const dataOutroStr = new Date(dataOutro).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      return dataOutroStr === dataEvento
+    })
+    if (outrosAg.length > 0) {
+      const outrosTexto = outrosAg.map(o => {
+        const servs = o.itens?.map(i => i.servico?.nome).filter(Boolean).join(', ') || ''
+        const hInicio = o.itens?.[0]?.data_hora_inicio
+          ? new Date(o.itens[0].data_hora_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+          : ''
+        return `• ${servs} – ${hInicio}`
+      }).join('\n')
+      outrosAgNoDia = `\n\n📅 Outros agendamentos hoje:\n${outrosTexto}`
+    }
+  }
+
   const pagInfo = ag?.pagamento
     ? `\nPagamento: R$ ${Number(ag.pagamento.valor).toFixed(2)} (${ag.pagamento.metodo})`
     : ''
   const obsInfo = ag?.observacoes ? `\nObs: ${ag.observacoes}` : ''
   const tooltipText = te(
-    `${clienteNome}\nStatus: ${STATUS_LABELS[ag?.status] ?? ag?.status ?? '—'}\n${itensTexto}${pagInfo}${obsInfo}`
+    `${clienteNome}\nStatus: ${STATUS_LABELS[ag?.status] ?? ag?.status ?? '—'}\n${itensTexto}${pagInfo}${obsInfo}${outrosAgNoDia}`
   )
 
   // ≤ 30 min (~48px): linha única compacta
@@ -2966,22 +3094,31 @@ function alterarStatus(id, novoStatus) {
 
 function confirmarExcluirAg(ag) {
   agParaExcluir.value = ag
+  erroExcluirAg.value = ''
   detalheAg.value = null
 }
 
-async function excluirAgendamento() {
+async function excluirAgendamento(forceDesvincular = false) {
   if (!agParaExcluir.value) return
   excluindoAg.value = true
+  erroExcluirAg.value = ''
   const id = agParaExcluir.value.id
   try {
-    await api.delete(`/agendamentos/${id}`)
+    const url = forceDesvincular ? `/agendamentos/${id}?force=true` : `/agendamentos/${id}`
+    await api.delete(url)
     // Remove localmente sem refetch completo — mantém a view atual do calendário
     agendamentos.value = agendamentos.value.filter(a => a.id !== id)
     agParaExcluir.value = null
     detalheAg.value = null
     toastSucesso('Agendamento excluído.')
   } catch (e) {
-    alert(e.response?.data?.detail || 'Erro ao excluir agendamento.')
+    const detail = e.response?.data?.detail || 'Erro ao excluir agendamento.'
+    // Se o erro é de conflito com comanda, mostra opção de forçar
+    if (e.response?.status === 409 && detail.includes('comanda')) {
+      erroExcluirAg.value = detail
+    } else {
+      alert(detail)
+    }
   } finally {
     excluindoAg.value = false
   }
