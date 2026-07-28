@@ -3,12 +3,12 @@
 
     <!-- Header -->
     <!-- Header compacto: busca + menu de ações unificado + botão Novo -->
-    <div class="flex items-center justify-between mb-3 flex-shrink-0 gap-2">
-      <h2 class="text-xl font-bold text-gray-800 shrink-0">Agendamentos</h2>
-      <div class="flex items-center gap-2">
+    <div class="flex items-center justify-between mb-3 flex-shrink-0 gap-2 flex-wrap">
+      <h2 class="text-lg sm:text-xl font-bold text-gray-800 shrink-0 order-1">Agendamentos</h2>
+      <div class="flex items-center gap-2 order-2 sm:order-3 ml-auto">
 
-        <!-- Busca por cliente (sempre visível) -->
-        <div class="relative">
+        <!-- Busca por cliente -->
+        <div class="relative hidden sm:block">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
           </svg>
@@ -47,8 +47,25 @@
           <div v-if="showMobileMenu" class="fixed inset-0 z-10" @click="showMobileMenu = false"></div>
           <div
             v-if="showMobileMenu"
-            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[220px] py-1.5 overflow-hidden"
+            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[250px] py-1.5 overflow-hidden"
           >
+            <!-- Busca no menu mobile -->
+            <div class="px-3 py-2">
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input
+                  v-model="buscaCalendario"
+                  type="search"
+                  placeholder="Buscar cliente..."
+                  class="w-full border border-gray-200 text-gray-600 text-sm pl-9 pr-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300"
+                />
+              </div>
+            </div>
+            
+            <div class="h-px bg-gray-100 mx-3 my-1"></div>
+            
             <button
               class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-rose-50 active:bg-rose-100 flex items-center gap-3"
               @click="showClientesPanel = true; showMobileMenu = false"
@@ -148,12 +165,14 @@
         </div>
 
         <!-- Botão principal: sempre visível com touch target mínimo de 44px -->
-        <div class="relative">
+        <div class="relative flex-shrink-0">
           <button
-            class="bg-rose-600 text-white text-sm font-semibold px-4 h-11 rounded-lg hover:bg-rose-700 transition-colors whitespace-nowrap flex items-center gap-1"
+            class="bg-rose-600 text-white text-sm font-semibold px-3 sm:px-4 h-10 sm:h-11 rounded-lg hover:bg-rose-700 transition-colors whitespace-nowrap flex items-center gap-1"
             @click="showNovoMenu = !showNovoMenu"
           >
-            + Novo <ChevronDown class="w-3.5 h-3.5 opacity-75" />
+            <span class="hidden sm:inline">+ Novo</span>
+            <span class="sm:hidden">+</span>
+            <ChevronDown class="w-3.5 h-3.5 opacity-75" />
           </button>
           <div v-if="showNovoMenu" class="fixed inset-0 z-10" @click="showNovoMenu = false"></div>
           <div
@@ -294,7 +313,7 @@
     </div>
 
     <!-- Calendário FullCalendar (visão padrão) -->
-    <div v-if="!colunaPorProfissional" class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper">
+    <div v-if="!colunaPorProfissional" class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper flex flex-col">
       <!--
         :key="isMobile ? 'fc-m' : 'fc-d'" — padrão avançado de Vue.
         FullCalendar tem estado interno (view atual, scroll position) que
@@ -303,18 +322,18 @@
         Isso é mais limpo do que manipular a API imperativa do FullCalendar.
       -->
       <!-- Barra de navegação: seletor de mês/ano + botão Visão Diária -->
-      <div class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
-        <label class="text-xs text-gray-500 font-medium whitespace-nowrap">Ir para:</label>
+      <div class="flex items-center gap-1 px-2 sm:px-3 py-2 border-b border-gray-100 bg-gray-50/60 flex-wrap">
+        <label class="text-xs text-gray-500 font-medium whitespace-nowrap hidden sm:inline">Ir para:</label>
         <select
           v-model="filtroAno"
-          class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
           @change="navegarParaMesAno"
         >
           <option v-for="a in anosDisponiveis" :key="a" :value="a">{{ a }}</option>
         </select>
         <select
           v-model="filtroMes"
-          class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
           @change="navegarParaMesAno"
         >
           <option v-for="(nome, idx) in MESES_PT" :key="idx" :value="idx">{{ nome }}</option>
@@ -323,27 +342,64 @@
           class="text-xs px-2 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
           @click="navegarParaHoje"
         >Hoje</button>
+        
+        <!-- Controles de Zoom (mobile) -->
+        <div v-if="isMobile" class="flex items-center gap-1 ml-1">
+          <button
+            @click="zoomOut"
+            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
+            title="Diminuir zoom"
+          >−</button>
+          <button
+            @click="resetZoom"
+            class="text-xs px-1.5 py-1 rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 min-w-[40px]"
+            :title="'Zoom: ' + Math.round(calendarZoom * 100) + '%'"
+          >{{ Math.round(calendarZoom * 100) }}%</button>
+          <button
+            @click="zoomIn"
+            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
+            title="Aumentar zoom"
+          >+</button>
+        </div>
+        
         <!-- Visão Diária — aqui junto com os controles de navegação do calendário -->
         <div class="ml-auto">
           <button
-            class="text-xs px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5"
+            class="text-xs px-2 sm:px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 sm:gap-1.5"
             :class="colunaPorProfissional ? 'border-rose-300 bg-rose-100 text-rose-700 font-semibold' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-100'"
             @click="toggleColunaPorProfissional()"
             title="Alternar Visão Diária por profissional"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
-            Visão Diária
+            <span class="hidden sm:inline">Visão Diária</span>
+            <span class="sm:hidden">Dia</span>
           </button>
         </div>
       </div>
 
-      <FullCalendar
-        v-if="!loading"
-        ref="calendarRef"
-        :key="isMobile ? 'fc-m' : 'fc-d'"
-        :options="calendarOptions"
-      />
-      <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
+      <!-- Wrapper com zoom aplicado -->
+      <div 
+        class="flex-1 overflow-auto fc-zoom-wrapper"
+        :style="isMobile ? { '--fc-zoom': calendarZoom } : {}"
+      >
+        <div 
+          class="fc-zoom-content"
+          :style="isMobile && calendarZoom !== 1 ? { 
+            transform: `scale(${calendarZoom})`, 
+            transformOrigin: 'top left',
+            width: `${100 / calendarZoom}%`,
+            minHeight: `${100 / calendarZoom}%`
+          } : {}"
+        >
+          <FullCalendar
+            v-if="!loading"
+            ref="calendarRef"
+            :key="isMobile ? 'fc-m' : 'fc-d'"
+            :options="calendarOptions"
+          />
+          <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
+        </div>
+      </div>
     </div>
 
     <!-- Visão diária por colunas (sem plugin premium) -->
@@ -1603,6 +1659,31 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
 const showMobileMenu = ref(false)
 const showNovoMenu = ref(false)
 
+// Zoom do calendário (mobile)
+const calendarZoom = ref(1)
+const ZOOM_LEVELS = [0.6, 0.75, 0.9, 1, 1.1, 1.25]
+function zoomIn() {
+  const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
+  if (currentIdx < ZOOM_LEVELS.length - 1) {
+    calendarZoom.value = ZOOM_LEVELS[currentIdx + 1]
+  } else if (currentIdx === -1) {
+    const nextIdx = ZOOM_LEVELS.findIndex(z => z > calendarZoom.value)
+    calendarZoom.value = nextIdx >= 0 ? ZOOM_LEVELS[nextIdx] : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
+  }
+}
+function zoomOut() {
+  const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
+  if (currentIdx > 0) {
+    calendarZoom.value = ZOOM_LEVELS[currentIdx - 1]
+  } else if (currentIdx === -1) {
+    const prevIdx = ZOOM_LEVELS.findIndex(z => z >= calendarZoom.value) - 1
+    calendarZoom.value = prevIdx >= 0 ? ZOOM_LEVELS[prevIdx] : ZOOM_LEVELS[0]
+  }
+}
+function resetZoom() {
+  calendarZoom.value = 1
+}
+
 // Toggle: mostrar ou esconder tarefas internas no calendário
 const mostrarTarefas = ref(true)
 
@@ -2484,7 +2565,8 @@ function renderEventContent(arg) {
     return {
       html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
         + flag
-        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}${estrela}</div>`
+        + estrela
+        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
         + `</div>`,
     }
@@ -2499,7 +2581,8 @@ function renderEventContent(arg) {
   return {
     html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
       + flag
-      + `<div class="fc-ev-title">${te(clienteNome)}${estrela}</div>`
+      + estrela
+      + `<div class="fc-ev-title">${te(clienteNome)}</div>`
       + (todosServicos ? `<div class="fc-ev-sub">${te(todosServicos)}</div>` : '')
       + (sub2 ? `<div class="fc-ev-sub">${te(sub2)}</div>` : '')
       + `</div>`,
@@ -3938,5 +4021,40 @@ onActivated(() => {
 @keyframes sgk-tooltip-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Zoom wrapper para mobile ── */
+.fc-zoom-wrapper {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+.fc-zoom-content {
+  min-height: 100%;
+  transition: transform 0.15s ease;
+}
+
+/* ── Mobile-specific improvements ── */
+@media (max-width: 640px) {
+  .fc-wrapper .fc-toolbar {
+    padding: 6px 8px !important;
+    gap: 4px;
+  }
+  .fc-wrapper .fc-toolbar-title {
+    font-size: 0.85rem !important;
+  }
+  .fc-wrapper .fc-button {
+    padding: 4px 8px !important;
+    font-size: 0.7rem !important;
+  }
+  .fc-wrapper .fc-timegrid-slot {
+    height: 2.5rem;
+  }
+  .fc-wrapper .fc-col-header-cell {
+    font-size: 0.65rem;
+    padding: 4px 0;
+  }
+  .fc-wrapper .fc-timegrid-slot-label {
+    font-size: 0.6rem;
+  }
 }
 </style>
