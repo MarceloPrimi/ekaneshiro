@@ -312,17 +312,149 @@
       </div>
     </div>
 
-    <!-- Calendário FullCalendar (visão padrão) -->
-    <div v-if="!colunaPorProfissional" class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper flex flex-col">
-      <!--
-        :key="isMobile ? 'fc-m' : 'fc-d'" — padrão avançado de Vue.
-        FullCalendar tem estado interno (view atual, scroll position) que
-        não é controlado por props. Mudar o key força o Vue a destruir o
-        componente antigo e criar um novo, aplicando a initialView correta.
-        Isso é mais limpo do que manipular a API imperativa do FullCalendar.
-      -->
-      <!-- Barra de navegação: seletor de mês/ano + botão Visão Diária -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         VISÃO MOBILE: Cards por dia (mais amigável para celular)
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="isMobile && mobileViewMode === 'cards' && !colunaPorProfissional" class="flex-1 flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <!-- Header: navegação de dias -->
+      <div class="flex items-center justify-between px-3 py-3 border-b border-gray-100 bg-gradient-to-r from-rose-50 to-white">
+        <button 
+          @click="mobileDiaAnterior"
+          class="w-11 h-11 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 shadow-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        
+        <div class="flex-1 text-center px-2">
+          <button 
+            @click="mobileDiaHoje"
+            class="text-sm font-bold text-gray-800 hover:text-rose-600 transition-colors"
+          >
+            {{ formatMobileDiaLabel(mobileDiaSelecionado) }}
+          </button>
+          <div class="flex items-center justify-center gap-2 mt-1">
+            <input 
+              v-model="mobileDiaSelecionado" 
+              type="date" 
+              class="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+            <span class="text-xs text-gray-400 font-medium">{{ agendamentosDoDiaMobile.length }} agendamentos</span>
+          </div>
+        </div>
+        
+        <button 
+          @click="mobileDiaProximo"
+          class="w-11 h-11 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 shadow-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Botão para alternar para calendário completo -->
+      <div class="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <button
+          @click="mobileViewMode = 'calendar'"
+          class="text-xs text-gray-500 hover:text-rose-600 font-medium flex items-center gap-1.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          Ver calendário completo
+        </button>
+      </div>
+      
+      <!-- Lista de cards -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-3">
+        <div v-if="loading" class="text-center py-10 text-sm text-gray-400">Carregando...</div>
+        
+        <div v-else-if="agendamentosDoDiaMobile.length === 0" class="text-center py-10">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <p class="text-sm text-gray-500 font-medium">Nenhum agendamento</p>
+          <p class="text-xs text-gray-400 mt-1">Este dia está livre</p>
+        </div>
+        
+        <div 
+          v-else
+          v-for="ag in agendamentosDoDiaMobile" 
+          :key="ag.id"
+          @click="detalheAg = ag"
+          class="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md active:shadow-inner transition-all cursor-pointer overflow-hidden"
+          :style="ag.cor_hex ? { borderLeftColor: ag.cor_hex, borderLeftWidth: '4px' } : {}"
+        >
+          <!-- Header do card -->
+          <div class="px-4 py-3 flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span 
+                  :class="{
+                    'bg-red-100 text-red-700': ag.status === 'pendente',
+                    'bg-green-100 text-green-700': ag.status === 'confirmado',
+                    'bg-blue-100 text-blue-700': ag.status === 'concluido',
+                  }"
+                  class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                >{{ ag.status === 'pendente' ? 'Pendente' : ag.status === 'confirmado' ? 'Confirmado' : ag.status }}</span>
+                <span class="text-xs text-gray-400">#{{ ag.id }}</span>
+              </div>
+              <h3 class="text-base font-bold text-gray-800 truncate">{{ ag.cliente?.nome }}</h3>
+              <p v-if="ag.cliente?.telefone" class="text-xs text-gray-500 mt-0.5">{{ ag.cliente.telefone }}</p>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-lg font-bold text-gray-800">
+                {{ ag.itens?.[0]?.data_hora_inicio ? new Date(ag.itens[0].data_hora_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '--:--' }}
+              </div>
+              <div v-if="ag.itens?.[0]?.data_hora_fim" class="text-xs text-gray-400">
+                até {{ new Date(ag.itens[0].data_hora_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) }}
+              </div>
+            </div>
+          </div>
+          
+          <!-- Serviços -->
+          <div class="px-4 pb-3 space-y-2">
+            <div 
+              v-for="item in ag.itens" 
+              :key="item.id"
+              class="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2"
+            >
+              <div class="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></div>
+              <div class="flex-1 min-w-0">
+                <span class="text-sm font-medium text-gray-800">{{ item.servico?.nome }}</span>
+                <span class="text-xs text-gray-500 ml-1.5">· {{ item.profissional?.nome }}</span>
+              </div>
+              <span class="text-xs text-gray-400 flex-shrink-0">
+                {{ item.servico?.preco ? 'R$ ' + Number(item.servico.preco).toFixed(0) : '' }}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Observações (se houver) -->
+          <div v-if="ag.observacoes" class="px-4 pb-3">
+            <p class="text-xs text-gray-500 bg-amber-50 rounded-lg px-3 py-2 line-clamp-2">
+              <span class="font-medium text-amber-700">Obs:</span> {{ ag.observacoes }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         CALENDÁRIO FULLCALENDAR (desktop ou quando selecionado no mobile)
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="!colunaPorProfissional && (!isMobile || mobileViewMode === 'calendar')" class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper flex flex-col">
+      <!-- Barra de navegação -->
       <div class="flex items-center gap-1 px-2 sm:px-3 py-2 border-b border-gray-100 bg-gray-50/60 flex-wrap">
+        <!-- Botão voltar para cards (mobile) -->
+        <button
+          v-if="isMobile"
+          @click="mobileViewMode = 'cards'"
+          class="text-xs px-2 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium mr-2"
+        >← Cards</button>
+        
         <label class="text-xs text-gray-500 font-medium whitespace-nowrap hidden sm:inline">Ir para:</label>
         <select
           v-model="filtroAno"
@@ -343,26 +475,7 @@
           @click="navegarParaHoje"
         >Hoje</button>
         
-        <!-- Controles de Zoom (mobile) -->
-        <div v-if="isMobile" class="flex items-center gap-1 ml-1">
-          <button
-            @click="zoomOut"
-            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
-            title="Diminuir zoom"
-          >−</button>
-          <button
-            @click="resetZoom"
-            class="text-xs px-1.5 py-1 rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 min-w-[40px]"
-            :title="'Zoom: ' + Math.round(calendarZoom * 100) + '%'"
-          >{{ Math.round(calendarZoom * 100) }}%</button>
-          <button
-            @click="zoomIn"
-            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
-            title="Aumentar zoom"
-          >+</button>
-        </div>
-        
-        <!-- Visão Diária — aqui junto com os controles de navegação do calendário -->
+        <!-- Visão Diária -->
         <div class="ml-auto">
           <button
             class="text-xs px-2 sm:px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 sm:gap-1.5"
@@ -384,12 +497,6 @@
           ref="calendarRef"
           :key="isMobile ? 'fc-m' : 'fc-d'"
           :options="calendarOptions"
-          :style="isMobile && calendarZoom !== 1 ? { 
-            transform: `scale(${calendarZoom})`, 
-            transformOrigin: 'top left',
-            width: `${100 / calendarZoom}%`,
-            height: `${100 / calendarZoom}%`
-          } : {}"
         />
         <div v-else class="p-10 text-center text-sm text-gray-400">Carregando...</div>
       </div>
@@ -1652,29 +1759,47 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
 const showMobileMenu = ref(false)
 const showNovoMenu = ref(false)
 
-// Zoom do calendário (mobile)
-const calendarZoom = ref(1)
-const ZOOM_LEVELS = [0.6, 0.75, 0.9, 1, 1.1, 1.25]
-function zoomIn() {
-  const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
-  if (currentIdx < ZOOM_LEVELS.length - 1) {
-    calendarZoom.value = ZOOM_LEVELS[currentIdx + 1]
-  } else if (currentIdx === -1) {
-    const nextIdx = ZOOM_LEVELS.findIndex(z => z > calendarZoom.value)
-    calendarZoom.value = nextIdx >= 0 ? ZOOM_LEVELS[nextIdx] : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
-  }
+// Visão mobile de cards (alternativa ao calendário de grade)
+const mobileViewMode = ref('cards') // 'cards' | 'calendar'
+const mobileDiaSelecionado = ref(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()))
+
+const agendamentosDoDiaMobile = computed(() => {
+  const diaStr = mobileDiaSelecionado.value
+  return agendamentos.value
+    .filter(ag => {
+      if (ag.status === 'cancelado') return false
+      const dataAg = ag.itens?.[0]?.data_hora_inicio
+      if (!dataAg) return false
+      const dataAgStr = new Date(dataAg).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      return dataAgStr === diaStr
+    })
+    .sort((a, b) => {
+      const aTime = new Date(a.itens?.[0]?.data_hora_inicio || 0).getTime()
+      const bTime = new Date(b.itens?.[0]?.data_hora_inicio || 0).getTime()
+      return aTime - bTime
+    })
+})
+
+function mobileDiaAnterior() {
+  const d = new Date(mobileDiaSelecionado.value + 'T12:00:00')
+  d.setDate(d.getDate() - 1)
+  mobileDiaSelecionado.value = d.toISOString().split('T')[0]
 }
-function zoomOut() {
-  const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
-  if (currentIdx > 0) {
-    calendarZoom.value = ZOOM_LEVELS[currentIdx - 1]
-  } else if (currentIdx === -1) {
-    const prevIdx = ZOOM_LEVELS.findIndex(z => z >= calendarZoom.value) - 1
-    calendarZoom.value = prevIdx >= 0 ? ZOOM_LEVELS[prevIdx] : ZOOM_LEVELS[0]
-  }
+function mobileDiaProximo() {
+  const d = new Date(mobileDiaSelecionado.value + 'T12:00:00')
+  d.setDate(d.getDate() + 1)
+  mobileDiaSelecionado.value = d.toISOString().split('T')[0]
 }
-function resetZoom() {
-  calendarZoom.value = 1
+function mobileDiaHoje() {
+  mobileDiaSelecionado.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+}
+function formatMobileDiaLabel(dateStr) {
+  if (!dateStr) return ''
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  const isHoje = dateStr === hoje
+  const d = new Date(dateStr + 'T12:00:00')
+  const label = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', timeZone: 'America/Sao_Paulo' })
+  return isHoje ? `Hoje, ${label}` : label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 // Toggle: mostrar ou esconder tarefas internas no calendário
