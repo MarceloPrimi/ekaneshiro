@@ -265,7 +265,7 @@
               <span v-if="ag.cliente?.telefone" class="text-xs text-gray-500">{{ ag.cliente.telefone }}</span>
               <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
                 :class="{
-                  'bg-amber-100 text-amber-700': ag.status === 'pendente',
+                  'bg-red-100 text-red-700': ag.status === 'pendente',
                   'bg-green-100 text-green-700': ag.status === 'confirmado',
                   'bg-gray-100 text-gray-600': ag.status === 'concluido',
                   'bg-purple-100 text-purple-700': ag.status === 'pre_agendamento',
@@ -637,6 +637,33 @@
           <!-- Esquerda: detalhes do agendamento -->
           <!-- sm:block garante visibilidade no desktop. No mobile, controla a tab ativa. -->
           <div :class="['flex-1 overflow-y-auto p-5 border-r border-gray-100 min-w-0', isPanelMobile && detalheTab !== 'servicos' ? 'hidden' : '']">
+            
+            <!-- Resumo do cliente (sempre visível na esquerda) -->
+            <div class="bg-rose-50 rounded-xl border border-rose-100 px-4 py-3 mb-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-gray-800">{{ detalheAg.cliente?.nome }}</p>
+                  <p v-if="detalheAg.cliente?.telefone" class="text-xs text-gray-600 mt-0.5">
+                    <a :href="'tel:' + detalheAg.cliente.telefone" class="hover:text-rose-600">{{ detalheAg.cliente.telefone }}</a>
+                  </p>
+                  <p v-if="detalheAg.cliente?.email" class="text-xs text-gray-500">{{ detalheAg.cliente.email }}</p>
+                </div>
+                <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span v-if="Number(detalheAg.cliente?.saldo_credito) > 0" class="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full px-2 py-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+                    R$ {{ Number(detalheAg.cliente?.saldo_credito).toFixed(2) }}
+                  </span>
+                  <a 
+                    v-if="detalheAg.cliente?.telefone"
+                    :href="'https://wa.me/' + detalheAg.cliente.telefone.replace(/\D/g, '')"
+                    target="_blank"
+                    class="text-xs text-green-600 hover:text-green-700 font-medium"
+                  >WhatsApp →</a>
+                </div>
+              </div>
+              <p v-if="detalheAg.cliente?.observacoes" class="text-xs text-gray-500 mt-2 line-clamp-2 italic">{{ detalheAg.cliente.observacoes }}</p>
+            </div>
+
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Serviços</h4>
             <div v-if="detalheAgColisoes.length" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
               <p class="text-xs font-semibold text-amber-800">Atenção: este agendamento colide com outro horário.</p>
@@ -660,8 +687,6 @@
             >
               <option value="pendente">Pendente</option>
               <option value="confirmado">Confirmado</option>
-              <option value="concluido">Concluído</option>
-              <option value="cancelado">Cancelado</option>
             </select>
 
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cor do Agendamento</h4>
@@ -1072,6 +1097,29 @@
                 <p v-if="Number(formCliente.saldo_credito) > 0" class="text-xs font-semibold text-green-700 mt-1">
                   Saldo de crédito: R$ {{ Number(formCliente.saldo_credito).toFixed(2) }}
                 </p>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cor do Card no Calendário</label>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="formCliente.cor_card"
+                    type="color"
+                    class="w-14 h-10 border border-gray-200 rounded-lg p-1 cursor-pointer"
+                  />
+                  <input
+                    v-model="formCliente.cor_card"
+                    type="text"
+                    class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm uppercase h-10"
+                    placeholder="#RRGGBB"
+                  />
+                  <button 
+                    type="button" 
+                    @click="formCliente.cor_card = ''"
+                    class="text-xs text-gray-400 hover:text-rose-600"
+                    v-if="formCliente.cor_card"
+                  >Limpar</button>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Define a cor dos agendamentos deste cliente no calendário</p>
               </div>
               <div>
                 <div class="flex items-center justify-between mb-1">
@@ -1565,7 +1613,7 @@ const savingCliente = ref(false)
 const erroCliente = ref('')
 const editandoCamposPainel = ref(false)
 const notasDrawerExpanded = ref(false)
-const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [] })
+const formCliente = ref({ nome: '', telefone: '', observacoes: '', campos_dinamicos: [], cor_card: '' })
 
 // DDI: separamos DDI e número para exibição; na persistência armazenamos no campo telefone
 const DDI_PAISES = [
@@ -1842,7 +1890,8 @@ function corComAlpha(hex, alpha) {
 }
 
 function getAgendamentoColor(ag) {
-  const bgBase = normalizarHexColor(ag?.cor_hex) || DEFAULT_AGENDAMENTO_COLOR
+  // Prioridade: cor do agendamento > cor do cliente > cor padrão
+  const bgBase = normalizarHexColor(ag?.cor_hex) || normalizarHexColor(ag?.cliente?.cor_card) || DEFAULT_AGENDAMENTO_COLOR
   const textoEscuro = !isHexCorEscura(bgBase)
   return {
     bg: corComAlpha(bgBase, 0.9),
@@ -2125,7 +2174,7 @@ function renderEventContent(arg) {
     : 60
 
   const STATUS_FLAG_COLOR = {
-    pendente:        '#4b5563',
+    pendente:        '#dc2626',  // vermelho para pendente
     confirmado:      '#15803d',
     concluido:       '#1d4ed8',
     pre_agendamento: '#b91c1c',
@@ -2133,6 +2182,15 @@ function renderEventContent(arg) {
   }
   const flagColor = STATUS_FLAG_COLOR[ag?.status] ?? '#9ca3af'
   const flag = `<span class="fc-ev-flag" style="border-top-color:${flagColor}" title="${ag?.status ?? ''}"></span>`
+  
+  // Verifica se o cliente tem múltiplos profissionais ou serviços neste dia
+  const temMultiplosProfissionais = (ag?.itens ?? []).length > 1 && 
+    new Set((ag?.itens ?? []).map(i => i.profissional_id)).size > 1
+  const temMultiplosServicos = (ag?.itens ?? []).length > 1
+  const mostrarEstrela = temMultiplosProfissionais || temMultiplosServicos
+  const estrela = mostrarEstrela 
+    ? `<span class="fc-ev-star" style="color:#15803d" title="Múltiplos serviços/profissionais">★</span>` 
+    : ''
 
   const firstName = (s) => s ? s.split(' ')[0] : ''
   const nomeClienteResumido = (nome) => {
@@ -2173,6 +2231,7 @@ function renderEventContent(arg) {
         + flag
         + `<span class="fc-ev-chip-name">${te(clienteDisplayCurto)}</span>`
         + (hora ? `<span class="fc-ev-chip-sep">·</span><span class="fc-ev-chip-time">${te(hora)}</span>` : '')
+        + estrela
         + `</div>`,
     }
   }
@@ -2183,7 +2242,7 @@ function renderEventContent(arg) {
     return {
       html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
         + flag
-        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
+        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}${estrela}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
         + `</div>`,
     }
@@ -2198,7 +2257,7 @@ function renderEventContent(arg) {
   return {
     html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
       + flag
-      + `<div class="fc-ev-title">${te(clienteNome)}</div>`
+      + `<div class="fc-ev-title">${te(clienteNome)}${estrela}</div>`
       + (todosServicos ? `<div class="fc-ev-sub">${te(todosServicos)}</div>` : '')
       + (sub2 ? `<div class="fc-ev-sub">${te(sub2)}</div>` : '')
       + `</div>`,
@@ -2614,7 +2673,7 @@ function profissionaisParaItem(item) {
 /** Classes de badge para cada status (paleta escura) */
 function statusBadgeClass(status) {
   return ({
-    pendente:        'bg-gray-600 text-gray-100',
+    pendente:        'bg-red-600 text-white',      // vermelho para pendente
     confirmado:      'bg-green-700 text-white',
     concluido:       'bg-blue-700 text-white',
     pre_agendamento: 'bg-red-700 text-white',
@@ -3110,6 +3169,7 @@ function abrirDrawerCliente(cliente = null) {
     telefone: parsed.numero,
     observacoes: cliente?.observacoes || '',
     campos_dinamicos: cliente?.campos_dinamicos ? JSON.parse(JSON.stringify(cliente.campos_dinamicos)) : [],
+    cor_card: cliente?.cor_card || '',
   }
   erroCliente.value = ''
   editandoCamposPainel.value = false
@@ -3126,6 +3186,7 @@ function abrirDrawerCliente(cliente = null) {
         observacoes: r.data.observacoes || '',
         campos_dinamicos: r.data.campos_dinamicos ? JSON.parse(JSON.stringify(r.data.campos_dinamicos)) : [],
         saldo_credito: r.data.saldo_credito ?? 0,
+        cor_card: r.data.cor_card || '',
       }
     }).catch(() => {})
     fetchHistoricoCliente(cliente.id)
@@ -3151,6 +3212,7 @@ async function salvarCliente() {
       telefone: montarTelefone(ddiCliente.value, formCliente.value.telefone),
       observacoes: formCliente.value.observacoes || null,
       campos_dinamicos: formCliente.value.campos_dinamicos.length ? formCliente.value.campos_dinamicos : null,
+      cor_card: formCliente.value.cor_card || null,
     }
     if (clienteSelecionadoPainel.value?.id) {
       const { data } = await api.patch(`/clientes/${clienteSelecionadoPainel.value.id}`, payload)
@@ -3468,6 +3530,18 @@ onActivated(() => {
   border-left: 14px solid transparent;
   pointer-events: none;
   z-index: 5;
+}
+
+/* Estrela para múltiplos serviços/profissionais — canto inferior direito */
+.fc-wrapper .fc-ev-star {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 0.65rem;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 5;
+  text-shadow: 0 0 2px rgba(255,255,255,0.8);
 }
 
 /* Chip inline de linha única para eventos curtos (≤30 min) */

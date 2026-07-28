@@ -13,6 +13,7 @@ class ClienteCreate(BaseModel):
     email: EmailStr | None = None
     observacoes: str | None = None
     campos_dinamicos: dict[str, Any] | list | None = None
+    cor_card: str | None = None
 
 
 class ClienteUpdate(BaseModel):
@@ -21,6 +22,7 @@ class ClienteUpdate(BaseModel):
     email: EmailStr | None = None
     observacoes: str | None = None
     campos_dinamicos: dict[str, Any] | list | None = None
+    cor_card: str | None = None
 
 
 class ClienteResponse(BaseModel):
@@ -33,4 +35,5 @@ class ClienteResponse(BaseModel):
     observacoes: str | None = None
     campos_dinamicos: dict[str, Any] | list | None = None
     saldo_credito: Decimal = Decimal("0.00")
+    cor_card: str | None = None
     criado_em: UTCDatetime

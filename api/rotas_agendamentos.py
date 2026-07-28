@@ -303,8 +303,33 @@ def excluir_agendamento(
     agendamento_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
+    force: bool = False,
 ):
+    from db.models import ItemComanda
+    
     agendamento = _get_agendamento_ou_404(agendamento_id, db)
     _verificar_acesso_profissional(current_user, agendamento)
+    
+    # Verifica se algum item do agendamento está em uma comanda
+    itens_em_comanda = (
+        db.query(ItemComanda)
+        .filter(ItemComanda.agendamento_id == agendamento_id)
+        .all()
+    )
+    
+    if itens_em_comanda and not force:
+        comanda_ids = set(ic.comanda_id for ic in itens_em_comanda)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Este agendamento está vinculado a comanda(s) #{', #'.join(map(str, comanda_ids))}. "
+                   f"Cancele ou feche a(s) comanda(s) primeiro, ou use force=true para desvincular.",
+        )
+    
+    # Se force=true, desvincula os itens da comanda
+    if itens_em_comanda and force:
+        for item in itens_em_comanda:
+            item.agendamento_id = None
+            item.item_agendamento_id = None
+    
     db.delete(agendamento)
     db.commit()

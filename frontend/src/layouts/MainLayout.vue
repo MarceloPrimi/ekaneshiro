@@ -88,8 +88,12 @@
 
     <!-- Main content -->
     <main
-      class="flex-1 overflow-auto p-4 sm:p-6 pb-20 lg:pb-6 transition-all duration-300 ease-in-out"
-      :class="drawerOpen ? 'lg:ml-56' : 'lg:ml-14'"
+      class="flex-1 overflow-auto p-4 sm:p-6 transition-all duration-300 ease-in-out"
+      :class="[
+        drawerOpen ? 'lg:ml-56' : 'lg:ml-14',
+        bottomNavMinimized ? 'pb-10' : 'pb-20',
+        'lg:pb-6'
+      ]"
     >
       <!-- KeepAlive mantém AgendamentosView em memória entre navegações,
            evitando re-montar e re-buscar dados toda vez que o usuário troca de aba. -->
@@ -159,18 +163,40 @@
     </transition-group>
 
     <!-- BOTTOM NAVIGATION BAR (mobile only) -->
-    <nav class="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100 shadow-[0_-1px_8px_rgba(0,0,0,0.06)] flex lg:hidden">
-      <RouterLink
-        v-for="item in navItemsMobile"
-        :key="item.to"
-        :to="item.to"
-        class="flex-1 flex flex-col items-center justify-center py-2 gap-1 text-gray-400 hover:text-rose-600 transition-colors min-h-[56px]"
-        active-class="text-rose-600"
-        @click="drawerOpen = false"
+    <nav 
+      :class="[
+        'fixed left-0 right-0 z-20 bg-white border-t border-gray-100 shadow-[0_-1px_8px_rgba(0,0,0,0.06)] lg:hidden transition-all duration-300 ease-in-out',
+        bottomNavMinimized ? 'bottom-0 h-6' : 'bottom-0'
+      ]"
+    >
+      <!-- Botão de minimizar/expandir -->
+      <button
+        @click="bottomNavMinimized = !bottomNavMinimized"
+        class="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-6 bg-white border border-b-0 border-gray-100 rounded-t-lg flex items-center justify-center text-gray-400 hover:text-rose-600 shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
+        :title="bottomNavMinimized ? 'Expandir menu' : 'Minimizar menu'"
       >
-        <component :is="item.icon" class="w-5 h-5" />
-        <span class="text-[10px] font-medium leading-none">{{ item.label }}</span>
-      </RouterLink>
+        <ChevronDown :class="['w-4 h-4 transition-transform', bottomNavMinimized ? 'rotate-180' : '']" />
+      </button>
+      
+      <!-- Menu expandido -->
+      <div v-if="!bottomNavMinimized" class="flex">
+        <RouterLink
+          v-for="item in navItemsMobile"
+          :key="item.to"
+          :to="item.to"
+          class="flex-1 flex flex-col items-center justify-center py-2 gap-1 text-gray-400 hover:text-rose-600 transition-colors min-h-[56px]"
+          active-class="text-rose-600"
+          @click="drawerOpen = false"
+        >
+          <component :is="item.icon" class="w-5 h-5" />
+          <span class="text-[10px] font-medium leading-none">{{ item.label }}</span>
+        </RouterLink>
+      </div>
+      
+      <!-- Menu minimizado - só ícone da página atual -->
+      <div v-else class="flex items-center justify-center h-full">
+        <span class="text-[10px] text-gray-400">Toque para expandir menu</span>
+      </div>
     </nav>
   </div>
 </template>
@@ -196,6 +222,7 @@ import {
   Sun,
   Moon,
   KeyRound,
+  ChevronDown,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDarkMode } from '@/composables/useDarkMode'
@@ -207,6 +234,7 @@ const { dark, toggle: toggleDark } = useDarkMode()
 const { toasts, sucesso: toastSucesso, erro: toastErro } = useToast()
 
 const drawerOpen = ref(window.innerWidth >= 1024)
+const bottomNavMinimized = ref(false)
 
 // --- modal minha senha ---
 const modalSenha = ref(false)

@@ -646,9 +646,9 @@ async function cancelarComanda() {
   erroComanda.value = ''
   try {
     await api.post(`/comandas/${props.modelValue.id}/cancelar`)
-    await recarregar()
     toastSucesso('Comanda cancelada.')
     emit('cancelada')
+    emit('update:modelValue', null)  // Fecha o modal automaticamente
   } catch (e) {
     erroComanda.value = e.response?.data?.detail || 'Erro ao cancelar comanda.'
   } finally {

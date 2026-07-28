@@ -79,6 +79,8 @@ class Cliente(Base):
     # JSON: lista de {chave, valor} para campos customizados
     campos_dinamicos = Column(JSON, nullable=True)
     saldo_credito = Column(Numeric(10, 2), nullable=False, default=0.00)
+    # Cor personalizada do card do cliente no calendário (formato hex: #RRGGBB)
+    cor_card = Column(String(7), nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     agendamentos = relationship("Agendamento", back_populates="cliente")
