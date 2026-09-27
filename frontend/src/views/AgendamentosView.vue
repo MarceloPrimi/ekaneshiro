@@ -44,10 +44,10 @@
               <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/>
             </svg>
           </button>
-          <div v-if="showMobileMenu" class="fixed inset-0 z-10" @click="showMobileMenu = false"></div>
+          <div v-if="showMobileMenu" class="fixed inset-0 z-40" @click="showMobileMenu = false"></div>
           <div
             v-if="showMobileMenu"
-            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 min-w-[250px] py-1.5 overflow-hidden"
+            class="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 min-w-[250px] py-1.5 overflow-hidden"
           >
             <!-- Busca no menu mobile -->
             <div class="px-3 py-2">
@@ -114,8 +114,8 @@
                   v-model="filtroProfissional"
                   class="w-full border border-gray-200 text-gray-600 text-sm px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-300"
                 >
-                  <option :value="null">Todos os profissionais</option>
-                  <option v-for="p in profissionais" :key="p.id" :value="p.id">{{ p.nome }}</option>
+                  <option value="">Todos os profissionais</option>
+                  <option v-for="p in profissionais" :key="p.id" :value="String(p.id)">{{ p.nome }}</option>
                 </select>
               </div>
             </template>
@@ -158,8 +158,8 @@
               v-model="filtroProfissional"
               class="h-11 min-w-[220px] border border-gray-200 text-gray-600 text-sm px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300"
             >
-              <option :value="null">Todos os profissionais</option>
-              <option v-for="p in profissionais" :key="p.id" :value="p.id">{{ p.nome }}</option>
+              <option value="">Todos os profissionais</option>
+              <option v-for="p in profissionais" :key="p.id" :value="String(p.id)">{{ p.nome }}</option>
             </select>
           </template>
         </div>
@@ -174,10 +174,10 @@
             <span class="sm:hidden">+</span>
             <ChevronDown class="w-3.5 h-3.5 opacity-75" />
           </button>
-          <div v-if="showNovoMenu" class="fixed inset-0 z-10" @click="showNovoMenu = false"></div>
+          <div v-if="showNovoMenu" class="fixed inset-0 z-40" @click="showNovoMenu = false"></div>
           <div
             v-if="showNovoMenu"
-            class="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[200px] p-1.5"
+            class="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[200px] p-1.5"
           >
             <button
               class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
@@ -319,16 +319,37 @@
       <!-- Barra de navegação -->
       <div class="flex items-center gap-1 px-2 sm:px-3 py-2 border-b border-gray-100 bg-gray-50/60 flex-wrap">
         <label class="text-xs text-gray-500 font-medium whitespace-nowrap hidden sm:inline">Ir para:</label>
+        <!-- Abre o seletor nativo do celular (iOS/Android) ou o popup do navegador no desktop -->
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 h-9 border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors font-medium"
+          title="Abrir calendário do aparelho"
+          aria-label="Escolher data no calendário do celular"
+          @click="abrirSeletorDataNativo"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-rose-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          <span>Data</span>
+        </button>
+        <input
+          ref="nativeDateInput"
+          type="date"
+          class="sr-only"
+          tabindex="-1"
+          aria-hidden="true"
+          @change="onNativeDatePicked"
+        />
         <select
           v-model="filtroAno"
-          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300 hidden sm:block"
           @change="navegarParaMesAno"
         >
           <option v-for="a in anosDisponiveis" :key="a" :value="a">{{ a }}</option>
         </select>
         <select
           v-model="filtroMes"
-          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          class="text-xs border border-gray-200 rounded-lg px-1.5 sm:px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-300 hidden sm:block"
           @change="navegarParaMesAno"
         >
           <option v-for="(nome, idx) in MESES_PT" :key="idx" :value="idx">{{ nome }}</option>
@@ -338,22 +359,24 @@
           @click="navegarParaHoje"
         >Hoje</button>
         
-        <!-- Controles de Zoom -->
-        <div class="flex items-center gap-1 ml-1">
+        <!-- Controles de Zoom (desktop: botões; mobile: pinça no calendário) -->
+        <div v-if="!isMobile" class="flex items-center gap-1 ml-1">
           <button
             @click="zoomOut"
-            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
+            class="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-base sm:text-sm font-bold"
             title="Diminuir zoom"
+            aria-label="Diminuir zoom"
           >−</button>
           <button
             @click="resetZoom"
-            class="text-xs px-1.5 py-1 rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 min-w-[40px]"
+            class="text-xs px-2 py-2 sm:px-1.5 sm:py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 min-w-[44px] sm:min-w-[40px]"
             :title="'Zoom: ' + Math.round(calendarZoom * 100) + '%'"
           >{{ Math.round(calendarZoom * 100) }}%</button>
           <button
             @click="zoomIn"
-            class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-sm font-bold"
+            class="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-base sm:text-sm font-bold"
             title="Aumentar zoom"
+            aria-label="Aumentar zoom"
           >+</button>
         </div>
         
@@ -372,26 +395,38 @@
         </div>
       </div>
 
-      <!-- Calendário com zoom -->
-      <div class="flex-1 relative overflow-auto">
-        <div 
-          class="fc-zoom-inner"
-          :style="{ 
-            transform: `scale(${calendarZoom})`, 
-            transformOrigin: 'top left',
-            width: calendarZoom !== 1 ? `${100 / calendarZoom}%` : '100%',
-            height: calendarZoom !== 1 ? `${100 / calendarZoom}%` : '100%',
-          }"
+      <!-- Desktop: transform scale. Mobile: pinça ajusta densidade (dayMinWidth/slots) sem quebrar scroll. -->
+      <div
+        ref="calendarPinchEl"
+        class="flex-1 relative min-h-0 overflow-hidden"
+        :style="isMobile ? { '--cal-zoom': String(calendarZoom) } : undefined"
+      >
+        <div
+          class="fc-zoom-inner h-full w-full"
+          :class="{ 'fc-zoom-scaled': effectiveCalendarZoom !== 1 }"
+          :style="effectiveCalendarZoom !== 1
+            ? {
+                transform: `scale(${effectiveCalendarZoom})`,
+                transformOrigin: 'top left',
+                width: `${100 / effectiveCalendarZoom}%`,
+                height: `${100 / effectiveCalendarZoom}%`,
+              }
+            : undefined"
         >
           <FullCalendar
-            v-if="!loading"
             ref="calendarRef"
-            :key="isMobile ? 'fc-m' : 'fc-d'"
             :options="calendarOptions"
           />
         </div>
-        <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white">
-          <span class="text-sm text-gray-400">Carregando...</span>
+        <button
+          v-if="showMobileZoomBadge"
+          type="button"
+          class="absolute bottom-3 right-3 z-20 rounded-full bg-gray-900/80 text-white text-xs font-semibold px-3 py-1.5 shadow-lg backdrop-blur-sm active:scale-95 transition-transform"
+          title="Toque para resetar o zoom"
+          @click="resetZoom"
+        >{{ Math.round(calendarZoom * 100) }}%</button>
+        <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white/70 z-10 pointer-events-none">
+          <span class="text-sm text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">Carregando...</span>
         </div>
       </div>
     </div>
@@ -485,8 +520,9 @@
     </div>
 
     <!-- MODAL: Novo / Editar Agendamento -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4" @click.self="showModal = false">
+      <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl shadow-xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-bold text-gray-800 mb-4">
           {{ modalMode === 'edit' ? `Editar Agendamento #${formData.id}` : 'Novo Agendamento' }}
         </h3>
@@ -656,7 +692,7 @@
       - v-if desmontaria/remontaria o DOM a cada clique na tab (animações, scroll resetam)
       - hidden + :class é mais performático para alternância frequente
     -->
-    <div v-if="detalheAg" class="fixed inset-0 bg-black/40 z-50 flex sm:items-stretch sm:justify-end items-end justify-center" @click.self="detalheAg = null">
+    <div v-if="detalheAg" class="fixed inset-0 bg-black/40 z-[60] flex sm:items-stretch sm:justify-end items-end justify-center" @click.self="detalheAg = null">
       <div class="bg-white w-full sm:max-w-3xl flex flex-col shadow-2xl sm:rounded-none rounded-t-3xl max-h-[92vh] sm:max-h-none sm:h-full">
         <!-- Drag handle (mobile only) — sinal visual de que o painel é deslizável -->
         <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"></div>
@@ -1091,7 +1127,7 @@
 
     <!-- PAINEL: Clientes -->
     <!-- PAINEL DE CLIENTES: lista + drawer de detalhes -->
-    <div v-if="showClientesPanel" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" @click.self="showClientesPanel = false; clienteDrawer = false; buscaCliente = ''">
+    <div v-if="showClientesPanel" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4" @click.self="showClientesPanel = false; clienteDrawer = false; buscaCliente = ''">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h3 class="text-lg font-bold text-gray-800">Clientes</h3>
@@ -1353,8 +1389,9 @@
     </div>
 
     <!-- MODAL: Tarefa Interna -->
-    <div v-if="showModalTarefa" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+    <div v-if="showModalTarefa" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-xl p-6 max-h-[92vh] overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-bold text-gray-800 mb-4">{{ modalTarefaMode === 'edit' ? 'Editar Tarefa' : 'Nova Tarefa' }}</h3>
         <form @submit.prevent="salvarTarefa" class="space-y-4">
           <div>
@@ -1398,8 +1435,9 @@
     </div>
 
     <!-- PAINEL: Detalhe da Tarefa -->
-    <div v-if="detalheTarefa" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="detalheTarefa = null">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+    <div v-if="detalheTarefa" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4" @click.self="detalheTarefa = null">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl shadow-xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <div class="flex items-start justify-between mb-4">
           <div class="flex items-center gap-2">
             <h3 class="text-base font-bold text-gray-800">{{ detalheTarefa.titulo }}</h3>
@@ -1491,8 +1529,9 @@
     />
 
     <!-- Modal de Feriado / Dia Bloqueado -->
-    <div v-if="showModalFeriado" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+    <div v-if="showModalFeriado" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl shadow-2xl p-6 flex flex-col gap-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto"></div>
         <h3 class="text-base font-bold text-gray-800">
           {{ formFeriado.id ? 'Editar Feriado' : 'Novo Feriado / Dia Bloqueado' }}
         </h3>
@@ -1585,12 +1624,28 @@ const loadedTo = ref(null)     // Date — fim do intervalo já carregado
 const fetchingRange = ref(false)
 const loadingClientes = ref(false)
 
-const filtroProfissional = ref(null)
+const filtroProfissional = ref('') // '' = todos; String(id) quando filtrado (nativo <select> sempre devolve string)
+/** ID numérico do profissional filtrado, ou null se “todos”. */
+const filtroProfissionalId = computed(() => {
+  const raw = filtroProfissional.value
+  if (raw === '' || raw == null || raw === 'null' || raw === 'undefined') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+})
 // usuario_id do profissional selecionado no filtro — ponte entre profissional.id e responsavel_id das tarefas
 const filtroProfissionalUsuarioId = computed(() => {
-  if (!filtroProfissional.value) return null
-  return profissionais.value.find(p => p.id === filtroProfissional.value)?.usuario_id ?? null
+  const pid = filtroProfissionalId.value
+  if (pid == null) return null
+  return profissionais.value.find(p => Number(p.id) === pid)?.usuario_id ?? null
 })
+
+/** Resolve o ID do profissional de um item (API só envia nested; alguns caminhos locais têm profissional_id). */
+function itemProfissionalId(item) {
+  const raw = item?.profissional?.id ?? item?.profissional_id
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
 const buscaCalendario = ref('')
 const filtroPendentesProximos = ref(false)
 const filtroAgendamentosRecentes = ref(false)
@@ -1609,10 +1664,12 @@ function addDiasUteis(date, days) {
 const agendamentosPendentesProximos = computed(() => {
   const agora = new Date()
   const limite = addDiasUteis(agora, 4)
+  const pid = filtroProfissionalId.value
   return agendamentos.value
     .filter(ag => {
       if (ag.status !== 'pendente') return false
       return ag.itens?.some(item => {
+        if (pid != null && itemProfissionalId(item) !== pid) return false
         const inicio = new Date(item.data_hora_inicio)
         return inicio >= agora && inicio <= limite
       })
@@ -1625,45 +1682,147 @@ const agendamentosPendentesProximos = computed(() => {
 })
 
 const agendamentosRecentes = computed(() => {
+  const pid = filtroProfissionalId.value
   return [...agendamentos.value]
+    .filter(ag => {
+      if (pid == null) return true
+      return (ag.itens ?? []).some(item => itemProfissionalId(item) === pid)
+    })
     .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
     .slice(0, 10)
 })
 
 // ─── Viewport & Mobile UI ──────────────────────────────────────────────────
-// isMobile é um ref reativo que rastreia a largura da janela. Não podemos
-// usar só CSS aqui porque precisamos que computed properties (como
-// calendarOptions) reajam a esta mudança e recalculem seus valores.
-// Breakpoint ajustado para o menu de ações entrar antes em telas médias.
-const MOBILE_BREAKPOINT = 1100
+// isMobile: menu de ações compacto + toolbar do FullCalendar.
+// isPhone: densidade da grade semanal (colunas scrolláveis, slots mais altos).
+const MOBILE_BREAKPOINT = 768
+const PHONE_BREAKPOINT = 640
 const isMobile = ref(window.innerWidth < MOBILE_BREAKPOINT)
-// Breakpoint menor usado nos painéis de detalhe (agendamento + cliente):
-// garante que ambas as colunas ficam visíveis lado a lado mesmo em tela dividida.
-// O Tailwind usa sm=640px para o mesmo efeito no CSS — mantemos consistência aqui.
+const isPhone = ref(window.innerWidth < PHONE_BREAKPOINT)
+// Painéis de detalhe usam o mesmo corte do Tailwind sm (640).
 const PANEL_BREAKPOINT = 640
 const isPanelMobile = ref(window.innerWidth < PANEL_BREAKPOINT)
 function handleResize() {
-  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
-  isPanelMobile.value = window.innerWidth < PANEL_BREAKPOINT
+  const nextMobile = window.innerWidth < MOBILE_BREAKPOINT
+  const nextPhone = window.innerWidth < PHONE_BREAKPOINT
+  const nextPanel = window.innerWidth < PANEL_BREAKPOINT
+  const phoneChanged = nextPhone !== isPhone.value
+  const mobileChanged = nextMobile !== isMobile.value
+  isMobile.value = nextMobile
+  isPhone.value = nextPhone
+  isPanelMobile.value = nextPanel
+  // Atualiza o calendário in-place (sem remount) para não perder eventos/navegação.
+  if (phoneChanged || mobileChanged) {
+    nextTick(() => syncCalendarForViewport())
+  }
 }
 onMounted(() => window.addEventListener('resize', handleResize))
-onUnmounted(() => window.removeEventListener('resize', handleResize))
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  unbindCalendarPinch()
+})
+
+function syncCalendarForViewport() {
+  const api = calendarRef.value?.getApi?.()
+  if (!api) return
+  try {
+    api.setOption(
+      'headerToolbar',
+      isMobile.value
+        ? { left: 'prev,next', center: 'title', right: 'today,timeGridWeek,listWeek' }
+        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+    )
+    if (isMobile.value) {
+      api.setOption('dayMinWidth', mobileDayMinWidth())
+      api.setOption('eventMinHeight', mobileEventMinHeight())
+    } else {
+      api.setOption('dayMinWidth', null)
+      api.setOption('eventMinHeight', 30)
+    }
+    api.updateSize()
+  } catch (e) {
+    console.warn('Falha ao sincronizar calendário no resize:', e)
+  }
+}
 
 // Controla o menu dropdown de ações secundárias no mobile
 const showMobileMenu = ref(false)
 const showNovoMenu = ref(false)
 
-// Zoom do calendário (funciona em todas as telas)
-const calendarZoom = ref(1)
+// ─── Zoom ──────────────────────────────────────────────────────────────────
+// Desktop: CSS transform (effectiveCalendarZoom).
+// Mobile: pinça ajusta densidade do FullCalendar (colunas/slots) — scroll nativo intacto.
+const ZOOM_STORAGE_KEY = 'sgk_calendar_zoom'
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2]
+const ZOOM_MIN = 0.55
+const ZOOM_MAX = 1.75
+const MOBILE_DAY_MIN_BASE = 110
+const MOBILE_EVENT_MIN_PHONE = 44
+const MOBILE_EVENT_MIN_TABLET = 36
+
+function loadInitialZoom() {
+  const saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY))
+  if (Number.isFinite(saved) && saved >= ZOOM_MIN && saved <= ZOOM_MAX) return saved
+  return 1
+}
+const calendarZoom = ref(loadInitialZoom())
+const pinchActive = ref(false)
+const calendarPinchEl = ref(null)
+/** Transform CSS só no desktop — no mobile quebra o scroll horizontal da semana. */
+const effectiveCalendarZoom = computed(() => (isMobile.value ? 1 : calendarZoom.value))
+const showMobileZoomBadge = computed(() =>
+  isMobile.value && (pinchActive.value || Math.abs(calendarZoom.value - 1) > 0.02),
+)
+
+function mobileDayMinWidth() {
+  return Math.round(MOBILE_DAY_MIN_BASE * calendarZoom.value)
+}
+function mobileEventMinHeight() {
+  const base = isPhone.value ? MOBILE_EVENT_MIN_PHONE : MOBILE_EVENT_MIN_TABLET
+  return Math.max(28, Math.round(base * calendarZoom.value))
+}
+
+function persistZoom() {
+  localStorage.setItem(ZOOM_STORAGE_KEY, String(calendarZoom.value))
+}
+
+function applyMobileDensityZoom() {
+  if (!isMobile.value) return
+  const api = calendarRef.value?.getApi?.()
+  if (!api) return
+  try {
+    api.setOption('dayMinWidth', mobileDayMinWidth())
+    api.setOption('eventMinHeight', mobileEventMinHeight())
+    api.updateSize()
+  } catch (e) {
+    console.warn('Falha ao aplicar zoom mobile:', e)
+  }
+}
+
+let zoomRaf = 0
+function setCalendarZoom(z, { persist = false } = {}) {
+  const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100))
+  if (zoomRaf) cancelAnimationFrame(zoomRaf)
+  zoomRaf = requestAnimationFrame(() => {
+    zoomRaf = 0
+    if (calendarZoom.value !== clamped) {
+      calendarZoom.value = clamped
+      applyMobileDensityZoom()
+    }
+    if (persist) persistZoom()
+  })
+}
+
 function zoomIn() {
   const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
-  if (currentIdx < ZOOM_LEVELS.length - 1) {
+  if (currentIdx >= 0 && currentIdx < ZOOM_LEVELS.length - 1) {
     calendarZoom.value = ZOOM_LEVELS[currentIdx + 1]
-  } else if (currentIdx === -1) {
+  } else {
     const nextIdx = ZOOM_LEVELS.findIndex(z => z > calendarZoom.value)
     calendarZoom.value = nextIdx >= 0 ? ZOOM_LEVELS[nextIdx] : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
   }
+  persistZoom()
+  applyMobileDensityZoom()
 }
 function zoomOut() {
   const currentIdx = ZOOM_LEVELS.indexOf(calendarZoom.value)
@@ -1672,10 +1831,70 @@ function zoomOut() {
   } else if (currentIdx === -1) {
     const prevIdx = ZOOM_LEVELS.findIndex(z => z >= calendarZoom.value) - 1
     calendarZoom.value = prevIdx >= 0 ? ZOOM_LEVELS[prevIdx] : ZOOM_LEVELS[0]
+  } else {
+    calendarZoom.value = ZOOM_LEVELS[0]
   }
+  persistZoom()
+  applyMobileDensityZoom()
 }
 function resetZoom() {
   calendarZoom.value = 1
+  persistZoom()
+  applyMobileDensityZoom()
+}
+
+// ─── Pinça (mobile) ────────────────────────────────────────────────────────
+function pinchDistance(t0, t1) {
+  return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+}
+
+let pinchStartDist = 0
+let pinchStartZoom = 1
+
+function onCalendarTouchStart(e) {
+  if (!isMobile.value || e.touches.length !== 2) return
+  pinchStartDist = pinchDistance(e.touches[0], e.touches[1])
+  pinchStartZoom = calendarZoom.value
+  pinchActive.value = true
+}
+
+function onCalendarTouchMove(e) {
+  if (!isMobile.value || e.touches.length !== 2 || pinchStartDist <= 0) return
+  // Bloqueia zoom da página; o calendário controla a escala.
+  e.preventDefault()
+  const dist = pinchDistance(e.touches[0], e.touches[1])
+  if (dist < 8) return
+  setCalendarZoom(pinchStartZoom * (dist / pinchStartDist))
+}
+
+function onCalendarTouchEnd(e) {
+  if (e.touches.length >= 2) return
+  if (pinchActive.value) {
+    pinchActive.value = false
+    pinchStartDist = 0
+    persistZoom()
+  }
+}
+
+let pinchBoundEl = null
+function bindCalendarPinch() {
+  const el = calendarPinchEl.value
+  if (!el || pinchBoundEl === el) return
+  if (pinchBoundEl) unbindCalendarPinch()
+  el.addEventListener('touchstart', onCalendarTouchStart, { passive: true })
+  el.addEventListener('touchmove', onCalendarTouchMove, { passive: false })
+  el.addEventListener('touchend', onCalendarTouchEnd, { passive: true })
+  el.addEventListener('touchcancel', onCalendarTouchEnd, { passive: true })
+  pinchBoundEl = el
+}
+function unbindCalendarPinch() {
+  const el = pinchBoundEl
+  if (!el) return
+  el.removeEventListener('touchstart', onCalendarTouchStart)
+  el.removeEventListener('touchmove', onCalendarTouchMove)
+  el.removeEventListener('touchend', onCalendarTouchEnd)
+  el.removeEventListener('touchcancel', onCalendarTouchEnd)
+  pinchBoundEl = null
 }
 
 // Toggle: mostrar ou esconder tarefas internas no calendário
@@ -1790,6 +2009,17 @@ const formClienteRapido = ref({ nome: '', telefone: '' })
 
 // Visão colunas por profissional
 const colunaPorProfissional = ref(false)
+
+watch(colunaPorProfissional, (isColuna) => {
+  if (isColuna) {
+    unbindCalendarPinch()
+    return
+  }
+  nextTick(() => {
+    bindCalendarPinch()
+    applyMobileDensityZoom()
+  })
+})
 
 // Tarefas internas
 const tarefas = ref([])
@@ -2097,6 +2327,48 @@ function navegarParaHoje() {
   if (api) api.today()
 }
 
+/** Input date oculto — dispara o calendário nativo do SO (iOS/Android) ou do browser. */
+const nativeDateInput = ref(null)
+
+function dataAtualDoCalendarioISO() {
+  const api = calendarRef.value?.getApi?.()
+  const d = api ? new Date(api.getDate()) : new Date()
+  return formatDateISOInSaoPaulo(d)
+}
+
+function abrirSeletorDataNativo() {
+  const el = nativeDateInput.value
+  if (!el) return
+  el.value = dataAtualDoCalendarioISO()
+  try {
+    if (typeof el.showPicker === 'function') {
+      el.showPicker()
+      return
+    }
+  } catch {
+    /* alguns browsers exigem gesto do usuário — já estamos num click */
+  }
+  el.click()
+}
+
+function onNativeDatePicked(e) {
+  const iso = e.target?.value
+  if (!iso) return
+  const [y, m, day] = iso.split('-').map(Number)
+  if (!y || !m || !day) return
+  const target = new Date(y, m - 1, day, 12, 0, 0)
+  filtroAno.value = y
+  filtroMes.value = m - 1
+  const api = calendarRef.value?.getApi?.()
+  if (api) api.gotoDate(target)
+
+  const inicio = new Date(y, m - 1, day - 7)
+  const fim = new Date(y, m - 1, day + 14)
+  if (!loadedFrom.value || inicio < loadedFrom.value || fim > loadedTo.value) {
+    fetchAgendamentos({ silent: true, merge: true, fromDate: inicio, toDate: fim })
+  }
+}
+
 const DUAS_SEMANAS_MS = 14 * 24 * 60 * 60 * 1000
 
 // Sincroniza os selects quando o usuário navega com prev/next do FullCalendar.
@@ -2187,7 +2459,7 @@ const computedSlotMax = computed(() => {
 
 const calendarEvents = computed(() => {
   const q = buscaCalendario.value.trim().toLowerCase()
-  const profFiltroId = filtroProfissional.value ? Number(filtroProfissional.value) : null
+  const profFiltroId = filtroProfissionalId.value
   const events = []
   for (const ag of agendamentos.value) {
     if (q && !(ag.cliente?.nome ?? '').toLowerCase().includes(q)) continue
@@ -2196,8 +2468,9 @@ const calendarEvents = computed(() => {
     // Agrupar itens por profissional para mesclar blocos consecutivos do mesmo atendimento
     const byProf = new Map()
     for (const item of ag.itens ?? []) {
-      if (profFiltroId && item.profissional?.id !== profFiltroId) continue
-      const profId = item.profissional?.id ?? item.profissional_id
+      const profId = itemProfissionalId(item)
+      if (profFiltroId != null && profId !== profFiltroId) continue
+      if (profId == null) continue
       if (!byProf.has(profId)) byProf.set(profId, [])
       byProf.get(profId).push(item)
     }
@@ -2247,14 +2520,14 @@ const TAREFA_COLORS_DONE = { bg: '#f3f4f6', border: '#9ca3af', text: '#6b7280' }
 
 const calendarEventsTarefas = computed(() => {
   const q = buscaCalendario.value.trim().toLowerCase()
-  const profFiltroAtivo = filtroProfissional.value !== null
+  const profFiltroAtivo = filtroProfissionalId.value != null
   const usuarioFiltro = filtroProfissionalUsuarioId.value
   return tarefas.value
     .filter(t => {
       if (profFiltroAtivo) {
         // Profissional sem usuario_id vinculado → nenhuma tarefa pode ser atribuída a ele
         if (usuarioFiltro === null) return false
-        if (t.responsavel_id !== usuarioFiltro) return false
+        if (Number(t.responsavel_id) !== Number(usuarioFiltro)) return false
       }
       return !q || t.titulo.toLowerCase().includes(q)
     })
@@ -2305,8 +2578,9 @@ const profissionaisColuna = computed(() => {
     const meuProf = profissionais.value.find(p => p.usuario_id === authStore.user?.id)
     return meuProf ? [meuProf] : []
   }
-  if (filtroProfissional.value) {
-    return profissionais.value.filter(p => p.id === Number(filtroProfissional.value))
+  const pid = filtroProfissionalId.value
+  if (pid != null) {
+    return profissionais.value.filter(p => Number(p.id) === pid)
   }
   return profissionais.value
 })
@@ -2318,9 +2592,9 @@ const calendarOptions = computed(() => ({
   // Mantém posicionamento na grade conforme o horário local informado pela API/UI.
   // Evita deslocamento de +3h quando o FullCalendar interpreta timezone nomeado.
   timeZone: 'local',
-  // Em telas menores (ex: notebook com tela dividida), manter visão semanal do calendário.
-  initialView: isMobile.value ? 'timeGridWeek' : 'timeGridWeek',
-  // No mobile, mantém navegação e alternância rápida entre semana e lista.
+  // Equipe usa a visão semanal no celular — mantém timeGridWeek como padrão.
+  initialView: 'timeGridWeek',
+  // No mobile: semana + lista; no desktop: mês/semana/dia/lista.
   headerToolbar: isMobile.value
     ? { left: 'prev,next', center: 'title', right: 'today,timeGridWeek,listWeek' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
@@ -2349,7 +2623,13 @@ const calendarOptions = computed(() => ({
   selectMirror: true,
   dayMaxEvents: true,
   eventMaxStack: 10,
-  eventMinHeight: 30,
+  // No mobile: colunas da semana com largura mínima → scroll horizontal (igual visão diária).
+  // Zoom por pinça multiplica dayMinWidth / eventMinHeight (sem CSS transform).
+  eventMinHeight: isMobile.value ? mobileEventMinHeight() : 30,
+  dayMinWidth: isMobile.value ? mobileDayMinWidth() : undefined,
+  stickyHeaderDates: true,
+  stickyFooterScrollbar: true,
+  longPressDelay: 300,
   weekends: true,
   firstDay: 1,
   height: '100%',
@@ -2473,7 +2753,8 @@ function renderEventContent(arg) {
     const todosProfissionaisNoDia = new Set()
     for (const agCliente of todosAgClienteNoDia) {
       for (const item of agCliente.itens ?? []) {
-        if (item.profissional_id) todosProfissionaisNoDia.add(item.profissional_id)
+        const pid = itemProfissionalId(item)
+        if (pid != null) todosProfissionaisNoDia.add(pid)
       }
     }
     mostrarEstrela = todosProfissionaisNoDia.size >= 2
@@ -2604,11 +2885,12 @@ function _showTooltip(text, anchorEl) {
   _destroyTooltip()
   const tip = document.createElement('div')
   tip.className = 'sgk-rich-tooltip'
-  // Cada linha com quebra real no HTML
-  tip.innerHTML = text
-    .split('\n')
-    .map(l => `<span>${l}</span>`)
-    .join('')
+  // textContent evita XSS (getAttribute decodifica entidades do data-tooltip)
+  for (const line of String(text).split('\n')) {
+    const span = document.createElement('span')
+    span.textContent = line
+    tip.appendChild(span)
+  }
   document.body.appendChild(tip)
   _tooltipEl = tip
 
@@ -3000,14 +3282,14 @@ function statusBadgeClass(status) {
 
 // ─── Tarefas Internas ──────────────────────────────────────────────────────
 const colunaTarefasDoDia = computed(() => {
-  const profFiltroAtivo = filtroProfissional.value !== null
+  const profFiltroAtivo = filtroProfissionalId.value != null
   const usuarioFiltro = filtroProfissionalUsuarioId.value
   return tarefas.value.filter(t => {
     const d = t.data_hora_inicio ? formatDateISOInSaoPaulo(new Date(t.data_hora_inicio)) : ''
     if (d !== colunaDia.value) return false
     if (profFiltroAtivo) {
       if (usuarioFiltro === null) return false
-      if (t.responsavel_id !== usuarioFiltro) return false
+      if (Number(t.responsavel_id) !== Number(usuarioFiltro)) return false
     }
     return true
   })
@@ -3428,7 +3710,7 @@ async function fetchAgendamentos(options = {}) {
     data_inicio: formatDateISOInSaoPaulo(inicio),
     data_fim: formatDateISOInSaoPaulo(fim),
   }
-  if (filtroProfissional.value) params.profissional_id = filtroProfissional.value
+  if (filtroProfissionalId.value != null) params.profissional_id = filtroProfissionalId.value
   try {
     const { data } = await api.get('/agendamentos/', { params })
     const mapped = (data || []).map(ag => ({
@@ -3466,10 +3748,12 @@ watch(filtroProfissional, () => {
   // Janela centrada em hoje (±31 dias = 62 dias total, dentro do cap do backend).
   // Evita o bug em que a janela padrão (hoje-3m → hoje+4m) era truncada pelo
   // backend para 'hoje-90 → hoje-28', excluindo completamente a semana atual.
+  // silent: o filtro client-side já atualiza o calendário; não bloquear a UI.
   const agora = new Date()
   const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, agora.getDate())
   const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, agora.getDate())
-  fetchAgendamentos({ fromDate: inicio, toDate: fim })
+  fetchAgendamentos({ silent: true, merge: false, fromDate: inicio, toDate: fim })
+    .then(() => { lastFetchAt.value = Date.now() })
 })
 
 // ─── Clientes CRUD ─────────────────────────────────────────────────────────
@@ -3757,6 +4041,12 @@ onMounted(async () => {
   } finally {
     loading.value = false
     lastFetchAt.value = Date.now()
+    // Garante dayMinWidth / scroll horizontal após o 1º paint (mobile).
+    nextTick(() => {
+      syncCalendarForViewport()
+      bindCalendarPinch()
+      applyMobileDensityZoom()
+    })
   }
 
   // ── Background: dados auxiliares e feriados (não bloqueiam a tela) ─────────
@@ -3770,11 +4060,25 @@ onMounted(async () => {
 // Se os dados ainda estão frescos (< 5 min), mostra o cache instantaneamente.
 // Se estiverem velhos, faz um refresh silencioso da janela atual em background.
 onActivated(() => {
-  if (!lastFetchAt.value) return  // primeira vez já tratada pelo onMounted
-  const stale = Date.now() - lastFetchAt.value > STALE_MS
-  if (!stale) return  // dados frescos → exibe cache, nenhuma request
+  nextTick(() => {
+    try {
+      calendarRef.value?.getApi?.()?.updateSize?.()
+    } catch {
+      /* calendário ainda não montado */
+    }
+  })
 
-  // Dados com mais de 5 min: refresh silencioso sem travar a tela
+  // HMR / estado quebrado: se loading ficou preso, libera a UI.
+  if (loading.value && lastFetchAt.value) loading.value = false
+
+  if (!lastFetchAt.value) return  // primeira vez já tratada pelo onMounted
+
+  // Cache vazio (ex.: HMR no meio do fetch) → recarrega mesmo se “fresco”.
+  const semDados = agendamentos.value.length === 0
+  const stale = Date.now() - lastFetchAt.value > STALE_MS
+  if (!stale && !semDados) return
+
+  // Dados velhos ou vazios: refresh silencioso sem travar a tela
   const cal = calendarRef.value?.getApi?.()
   const viewDate = cal ? new Date(cal.getDate()) : new Date()
   const refreshInicio = new Date(viewDate.getTime() - 7 * 86400000)
@@ -3819,7 +4123,7 @@ onActivated(() => {
   outline: none !important;
 }
 .fc-wrapper .fc-timegrid-slot {
-  height: 1.5rem !important;
+  height: calc(1.5rem * var(--cal-zoom, 1)) !important;
 }
 .fc-wrapper .fc-timegrid-event-harness {
   z-index: 1;
@@ -3898,8 +4202,11 @@ onActivated(() => {
 
 /* Zoom inner wrapper */
 .fc-zoom-inner {
-  transition: transform 0.15s ease;
   height: 100%;
+  min-height: 0;
+}
+.fc-zoom-inner.fc-zoom-scaled {
+  transition: transform 0.15s ease;
 }
 
 /* Chip inline de linha única para eventos curtos (≤30 min) */
@@ -4021,28 +4328,46 @@ onActivated(() => {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Mobile-specific improvements ── */
-@media (max-width: 640px) {
+/* ── Mobile / tablet: semana com scroll horizontal ── */
+@media (max-width: 768px) {
   .fc-wrapper .fc-toolbar {
-    padding: 6px 8px !important;
-    gap: 4px;
+    padding: 8px 6px !important;
+    gap: 6px;
+    flex-wrap: wrap;
   }
   .fc-wrapper .fc-toolbar-title {
-    font-size: 0.85rem !important;
+    font-size: 0.9rem !important;
   }
   .fc-wrapper .fc-button {
-    padding: 4px 8px !important;
-    font-size: 0.7rem !important;
+    padding: 8px 10px !important;
+    font-size: 0.75rem !important;
+    min-height: 36px;
+  }
+  .fc-wrapper .fc-button-group {
+    gap: 2px;
   }
   .fc-wrapper .fc-timegrid-slot {
-    height: 2.5rem;
+    height: calc(2.75rem * var(--cal-zoom, 1)) !important;
   }
   .fc-wrapper .fc-col-header-cell {
-    font-size: 0.65rem;
-    padding: 4px 0;
+    font-size: 0.7rem;
+    padding: 6px 2px;
+    min-width: calc(110px * var(--cal-zoom, 1));
   }
   .fc-wrapper .fc-timegrid-slot-label {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
+  }
+  .fc-wrapper .fc-event {
+    border-radius: 6px !important;
+  }
+  .fc-wrapper .fc-scrollgrid {
+    border-radius: 0;
+  }
+  .fc-wrapper .fc-scroller {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    /* pan livre; pinça é tratada em JS (touchmove preventDefault com 2 dedos) */
+    touch-action: pan-x pan-y;
   }
 }
 </style>

@@ -3,11 +3,22 @@ import { ref, computed } from 'vue'
 import api from '@/api/client'
 
 export const useAuthStore = defineStore('auth', () => {
+  let initialUser = null
+  try {
+    initialUser = JSON.parse(localStorage.getItem('sgk_user') || 'null')
+  } catch {
+    localStorage.removeItem('sgk_user')
+  }
+
   const token = ref(localStorage.getItem('sgk_token') || null)
-  const user = ref(JSON.parse(localStorage.getItem('sgk_user') || 'null'))
+  const user = ref(initialUser)
 
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
+  const isRecepcionista = computed(() => user.value?.role === 'recepcionista')
+  const isRecepcionistaOuAdmin = computed(() =>
+    ['recepcionista', 'admin'].includes(user.value?.role),
+  )
 
   async function login(username, senha) {
     const params = new URLSearchParams()
@@ -36,5 +47,15 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('sgk_user')
   }
 
-  return { token, user, isAuthenticated, isAdmin, login, logout, fetchMe }
+  return {
+    token,
+    user,
+    isAuthenticated,
+    isAdmin,
+    isRecepcionista,
+    isRecepcionistaOuAdmin,
+    login,
+    logout,
+    fetchMe,
+  }
 })

@@ -3,15 +3,17 @@
     <!-- Overlay mobile -->
     <div
       v-if="drawerOpen"
-      class="fixed inset-0 bg-black/40 z-20 lg:hidden"
+      class="fixed inset-0 bg-black/40 z-40 lg:hidden"
       @click="drawerOpen = false"
     />
 
     <!-- Sidebar / Drawer -->
     <aside
       :class="[
-        'fixed inset-y-0 left-0 z-30 flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out',
-        drawerOpen ? 'w-56' : 'w-0 lg:w-14 overflow-hidden',
+        'fixed inset-y-0 left-0 z-50 flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out',
+        drawerOpen
+          ? 'w-56 pointer-events-auto'
+          : 'w-0 lg:w-14 overflow-hidden pointer-events-none lg:pointer-events-auto',
       ]"
     >
       <!-- Brand + toggle -->
@@ -79,34 +81,36 @@
 
     <!-- Hamburger button (mobile, shown when drawer is closed) -->
     <button
-      class="fixed top-3 left-3 z-40 lg:hidden w-9 h-9 flex items-center justify-center bg-white border border-gray-200 rounded-lg shadow-sm text-gray-500 hover:bg-gray-50 transition-colors"
+      class="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-50 lg:hidden w-11 h-11 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-sm text-gray-500 hover:bg-gray-50 transition-colors"
       :class="{ 'opacity-0 pointer-events-none': drawerOpen }"
       @click="drawerOpen = true"
+      aria-label="Abrir menu"
     >
       <Menu class="w-5 h-5" />
     </button>
 
     <!-- Main content -->
     <main
-      class="flex-1 overflow-auto p-4 sm:p-6 transition-all duration-300 ease-in-out"
+      class="flex-1 overflow-auto p-4 pt-14 sm:p-6 sm:pt-6 transition-all duration-300 ease-in-out"
       :class="[
         drawerOpen ? 'lg:ml-56' : 'lg:ml-14',
-        bottomNavMinimized ? 'pb-10' : 'pb-20',
-        'lg:pb-6'
+        bottomNavMinimized ? 'pb-[calc(2.5rem+env(safe-area-inset-bottom))]' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]',
+        'lg:pb-6 lg:pt-6'
       ]"
     >
-      <!-- KeepAlive mantém AgendamentosView em memória entre navegações,
-           evitando re-montar e re-buscar dados toda vez que o usuário troca de aba. -->
-      <RouterView v-slot="{ Component, route }">
+      <!-- KeepAlive mantém views em memória entre navegações.
+           NÃO use :key="route.path" aqui — isso remonta a view a cada troca
+           e quebra cache, fetch e a transição no mobile. -->
+      <RouterView v-slot="{ Component }">
         <KeepAlive :include="KEEP_ALIVE_VIEWS">
-          <component :is="Component" :key="route.path" />
+          <component :is="Component" />
         </KeepAlive>
       </RouterView>
     </main>
 
     <!-- Modal: Minha Senha -->
-    <div v-if="modalSenha" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" @click.self="modalSenha = false">
-      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl overflow-hidden">
+    <div v-if="modalSenha" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4" @click.self="modalSenha = false">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl overflow-hidden pb-[env(safe-area-inset-bottom)]">
         <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1"></div>
         <div class="px-6 pt-5 pb-2">
           <h3 class="text-lg font-semibold text-gray-800 mb-4">Alterar senha</h3>
@@ -142,7 +146,7 @@
     <transition-group
       tag="div"
       name="toast"
-      class="fixed bottom-20 lg:bottom-6 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
+      class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-6 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
     >
       <div
         v-for="t in toasts"
@@ -162,51 +166,78 @@
       </div>
     </transition-group>
 
-    <!-- BOTTOM NAVIGATION BAR (mobile only) -->
+    <!-- BOTTOM NAVIGATION BAR (mobile only) — z-30 fica ABAIXO dos modais (z-50/z-60) -->
     <nav 
       :class="[
-        'fixed left-0 right-0 z-20 bg-white border-t border-gray-100 shadow-[0_-1px_8px_rgba(0,0,0,0.06)] lg:hidden transition-all duration-300 ease-in-out',
-        bottomNavMinimized ? 'bottom-0 h-6' : 'bottom-0'
+        'fixed left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-[0_-1px_8px_rgba(0,0,0,0.06)] lg:hidden transition-all duration-300 ease-in-out pb-[env(safe-area-inset-bottom)]',
+        bottomNavMinimized ? 'bottom-0 h-[calc(1.5rem+env(safe-area-inset-bottom))]' : 'bottom-0'
       ]"
     >
-      <!-- Botão de minimizar/expandir -->
       <button
         @click="bottomNavMinimized = !bottomNavMinimized"
-        class="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-6 bg-white border border-b-0 border-gray-100 rounded-t-lg flex items-center justify-center text-gray-400 hover:text-rose-600 shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
+        class="absolute -top-8 left-1/2 -translate-x-1/2 w-14 h-8 bg-white border border-b-0 border-gray-100 rounded-t-xl flex items-center justify-center text-gray-400 hover:text-rose-600 shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
         :title="bottomNavMinimized ? 'Expandir menu' : 'Minimizar menu'"
+        aria-label="Alternar menu inferior"
       >
-        <ChevronDown :class="['w-4 h-4 transition-transform', bottomNavMinimized ? 'rotate-180' : '']" />
+        <ChevronDown :class="['w-5 h-5 transition-transform', bottomNavMinimized ? 'rotate-180' : '']" />
       </button>
       
-      <!-- Menu expandido -->
       <div v-if="!bottomNavMinimized" class="flex">
         <RouterLink
-          v-for="item in navItemsMobile"
+          v-for="item in navItemsPrimary"
           :key="item.to"
           :to="item.to"
-          class="flex-1 flex flex-col items-center justify-center py-2 gap-1 text-gray-400 hover:text-rose-600 transition-colors min-h-[56px]"
+          class="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-gray-400 hover:text-rose-600 transition-colors min-h-[60px]"
           active-class="text-rose-600"
-          @click="drawerOpen = false"
+          @click="drawerOpen = false; moreOpen = false"
         >
           <component :is="item.icon" class="w-5 h-5" />
-          <span class="text-[10px] font-medium leading-none">{{ item.label }}</span>
+          <span class="text-[10px] font-medium leading-none truncate max-w-[4.5rem] text-center">{{ item.label }}</span>
         </RouterLink>
+        <button
+          v-if="navItemsMore.length"
+          type="button"
+          class="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors min-h-[60px]"
+          :class="moreOpen || isMoreRouteActive ? 'text-rose-600' : 'text-gray-400 hover:text-rose-600'"
+          @click="moreOpen = !moreOpen"
+        >
+          <MoreHorizontal class="w-5 h-5" />
+          <span class="text-[10px] font-medium leading-none">Mais</span>
+        </button>
       </div>
       
-      <!-- Menu minimizado - só ícone da página atual -->
-      <div v-else class="flex items-center justify-center h-full">
+      <div v-else class="flex items-center justify-center h-6" @click="bottomNavMinimized = false">
         <span class="text-[10px] text-gray-400">Toque para expandir menu</span>
       </div>
     </nav>
+
+    <!-- Sheet "Mais" (admin + overflow) -->
+    <div v-if="moreOpen" class="fixed inset-0 z-[55] lg:hidden" @click.self="moreOpen = false">
+      <div class="absolute inset-0 bg-black/40" @click="moreOpen = false"></div>
+      <div class="absolute inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Mais opções</p>
+        <RouterLink
+          v-for="item in navItemsMore"
+          :key="item.to"
+          :to="item.to"
+          class="flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-rose-50 hover:text-rose-600"
+          active-class="bg-rose-50 text-rose-600"
+          @click="moreOpen = false; drawerOpen = false"
+        >
+          <component :is="item.icon" class="w-5 h-5" />
+          {{ item.label }}
+        </RouterLink>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 
 // Views mantidas em memória entre navegações — trocar de aba e voltar é instantâneo.
-// Pagamentos e Profissionais têm onActivated com staleness check de 5 min.
-// RelatoriosView e UsuariosView ficam de fora (dados devem ser sempre frescos / payload leve).
 const KEEP_ALIVE_VIEWS = ['AgendamentosView', 'PagamentosView', 'ProfissionaisView', 'ServicosView', 'ProdutosView']
 import {
   Calendar,
@@ -223,6 +254,7 @@ import {
   Moon,
   KeyRound,
   ChevronDown,
+  MoreHorizontal,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDarkMode } from '@/composables/useDarkMode'
@@ -230,11 +262,24 @@ import { useToast } from '@/composables/useToast'
 import api from '@/api/client'
 
 const auth = useAuthStore()
+const route = useRoute()
 const { dark, toggle: toggleDark } = useDarkMode()
 const { toasts, sucesso: toastSucesso, erro: toastErro } = useToast()
 
-const drawerOpen = ref(window.innerWidth >= 1024)
+const NAV_DESKTOP = 1024
+const drawerOpen = ref(window.innerWidth >= NAV_DESKTOP)
 const bottomNavMinimized = ref(false)
+const moreOpen = ref(false)
+
+/** Ao entrar em viewport mobile (DevTools ou resize), fecha o drawer —
+ *  senão o overlay fixed inset-0 fica preso e bloqueia todos os cliques. */
+function syncDrawerOnResize() {
+  if (window.innerWidth < NAV_DESKTOP) {
+    drawerOpen.value = false
+  }
+}
+onMounted(() => window.addEventListener('resize', syncDrawerOnResize))
+onUnmounted(() => window.removeEventListener('resize', syncDrawerOnResize))
 
 // --- modal minha senha ---
 const modalSenha = ref(false)
@@ -246,6 +291,7 @@ function abrirModalSenha() {
   formSenha.value = { senha_atual: '', nova_senha: '', confirmar: '' }
   erroSenha.value = ''
   modalSenha.value = true
+  moreOpen.value = false
 }
 
 async function salvarMinhaSenha() {
@@ -270,7 +316,7 @@ async function salvarMinhaSenha() {
 }
 
 function closeMobileDrawer() {
-  if (window.innerWidth < 1024) drawerOpen.value = false
+  if (window.innerWidth < NAV_DESKTOP) drawerOpen.value = false
 }
 
 const navItems = computed(() => {
@@ -288,7 +334,12 @@ const navItems = computed(() => {
   return items
 })
 
-const navItemsMobile = computed(() => navItems.value.slice(0, 5))
+// 4 principais na barra; o restante (Produtos + admin) no sheet "Mais"
+const navItemsPrimary = computed(() => navItems.value.slice(0, 4))
+const navItemsMore = computed(() => navItems.value.slice(4))
+const isMoreRouteActive = computed(() =>
+  navItemsMore.value.some((item) => route.path.startsWith(item.to)),
+)
 </script>
 
 <style scoped>

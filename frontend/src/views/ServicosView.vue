@@ -314,7 +314,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 
 defineOptions({ name: 'ServicosView' })
 import api from '@/api/client'
@@ -490,8 +490,19 @@ async function fetchServicos() {
   }
 }
 
+const lastFetchAt = ref(0)
+const STALE_MS = 5 * 60 * 1000
+
 onMounted(() => {
   fetchServicos()
+  fetchSecoes()
+  lastFetchAt.value = Date.now()
+})
+
+onActivated(() => {
+  if (!lastFetchAt.value) return
+  if (Date.now() - lastFetchAt.value < STALE_MS) return
+  fetchServicos().then(() => { lastFetchAt.value = Date.now() })
   fetchSecoes()
 })
 

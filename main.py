@@ -17,16 +17,22 @@ from api.rotas_comandas import router as comandas_router
 
 from core.config import settings
 
-app = FastAPI(
-    title="SGK — Sistema de Gestão Kaneshiro",
-    description="API para gestão de agendamentos, profissionais e caixa do salão.",
-    version="0.1.0",
-)
-
 # --- CORS ---
 # Em produção, defina ALLOWED_ORIGINS no painel da plataforma com a URL do frontend.
 # Múltiplas origens separadas por vírgula: "https://a.vercel.app,https://b.com"
 _origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+# Com frontend HTTPS (produção), desliga a documentação interativa da API.
+_is_prod = any(o.startswith("https://") for o in _origins)
+
+app = FastAPI(
+    title="SGK — Sistema de Gestão Kaneshiro",
+    description="API para gestão de agendamentos, profissionais e caixa do salão.",
+    version="0.1.0",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,

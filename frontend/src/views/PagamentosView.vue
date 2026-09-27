@@ -189,42 +189,57 @@
         <div v-else-if="agendamentosPagos.length === 0" class="p-6 text-center text-sm text-gray-400">
           Nenhum pagamento registrado no período.
         </div>
-        <table v-else class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Cliente</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Serviços</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Valor</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Método</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Data</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Ações</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="ag in agendamentosPagos" :key="ag.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-medium text-gray-800">{{ ag.cliente?.nome || '-' }}</td>
-              <td class="px-4 py-3 text-gray-600">
-                <div v-for="item in ag.itens" :key="item.id" class="text-xs leading-5">
-                  {{ item.servico?.nome }}
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span class="font-semibold text-green-700">R$ {{ Number(ag.pagamento?.valor || 0).toFixed(2) }}</span>
-                <span v-if="Number(ag.pagamento?.credito_utilizado) > 0" class="block text-xs text-indigo-600">
-                  (crédito: R$ {{ Number(ag.pagamento.credito_utilizado).toFixed(2) }})
-                </span>
-              </td>
-              <td class="px-4 py-3 text-gray-600 text-xs">{{ metodoPagLabel(ag.pagamento?.metodo) }}</td>
-              <td class="px-4 py-3 text-gray-400 text-xs">{{ formatDate(ag.pagamento?.pago_em) }}</td>
-              <td class="px-4 py-3">
-                <button
-                  @click="abrirModalEditar(ag)"
-                  class="text-xs text-amber-600 hover:text-amber-700 font-medium"
-                >Editar</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <template v-else>
+          <table class="w-full text-sm hidden sm:table">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Cliente</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Serviços</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Valor</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Método</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Data</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr v-for="ag in agendamentosPagos" :key="ag.id" class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-800">{{ ag.cliente?.nome || '-' }}</td>
+                <td class="px-4 py-3 text-gray-600">
+                  <div v-for="item in ag.itens" :key="item.id" class="text-xs leading-5">
+                    {{ item.servico?.nome }}
+                  </div>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="font-semibold text-green-700">R$ {{ Number(ag.pagamento?.valor || 0).toFixed(2) }}</span>
+                  <span v-if="Number(ag.pagamento?.credito_utilizado) > 0" class="block text-xs text-indigo-600">
+                    (crédito: R$ {{ Number(ag.pagamento.credito_utilizado).toFixed(2) }})
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600 text-xs">{{ metodoPagLabel(ag.pagamento?.metodo) }}</td>
+                <td class="px-4 py-3 text-gray-400 text-xs">{{ formatDate(ag.pagamento?.pago_em) }}</td>
+                <td class="px-4 py-3">
+                  <button
+                    @click="abrirModalEditar(ag)"
+                    class="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                  >Editar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="sm:hidden divide-y divide-gray-100">
+            <div v-for="ag in agendamentosPagos" :key="'pm-' + ag.id" class="p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-semibold text-gray-800">{{ ag.cliente?.nome || '-' }}</p>
+                <span class="font-semibold text-green-700 text-sm">R$ {{ Number(ag.pagamento?.valor || 0).toFixed(2) }}</span>
+              </div>
+              <p class="text-xs text-gray-500">{{ ag.itens?.map(i => i.servico?.nome).filter(Boolean).join(', ') }}</p>
+              <div class="flex items-center justify-between text-xs text-gray-400">
+                <span>{{ metodoPagLabel(ag.pagamento?.metodo) }} · {{ formatDate(ag.pagamento?.pago_em) }}</span>
+                <button @click="abrirModalEditar(ag)" class="text-amber-600 font-medium py-2">Editar</button>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -237,8 +252,9 @@
     />
 
     <!-- Modal Editar Pagamento (legado) -->
-    <div v-if="modalEditarAberto" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+    <div v-if="modalEditarAberto" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-semibold text-gray-800 mb-1">Editar Pagamento</h3>
         <p class="text-sm text-gray-500 mb-4">#{{ agEditarSelecionado?.id }} · {{ agEditarSelecionado?.cliente?.nome }}</p>
         <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">

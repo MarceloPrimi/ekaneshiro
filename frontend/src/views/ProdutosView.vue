@@ -13,14 +13,14 @@
         >Categorias</button>
       </div>
       <button
-        v-if="(auth.isAdmin || auth.isRecepcionista) && abaAtiva === 'produtos'"
+        v-if="auth.isRecepcionistaOuAdmin && abaAtiva === 'produtos'"
         @click="abrirModalNovo"
         class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
       >
         + Novo Produto
       </button>
       <button
-        v-if="(auth.isAdmin || auth.isRecepcionista) && abaAtiva === 'categorias'"
+        v-if="auth.isRecepcionistaOuAdmin && abaAtiva === 'categorias'"
         @click="abrirModalNovaCategoria"
         class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
       >
@@ -52,49 +52,74 @@
       </label>
     </div>
 
-    <!-- Tabela -->
+    <!-- Tabela (desktop) + cards (mobile) -->
     <div v-if="abaAtiva === 'produtos'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div v-if="loading" class="p-8 text-center text-sm text-gray-400">Carregando...</div>
       <div v-else-if="!produtosFiltrados.length" class="p-8 text-center text-sm text-gray-400">Nenhum produto encontrado.</div>
-      <table v-else class="w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Categoria</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Marca</th>
-            <th class="text-right px-4 py-3 font-medium text-gray-600">Estoque</th>
-            <th class="text-right px-4 py-3 font-medium text-gray-600">Mínimo</th>
-            <th class="text-right px-4 py-3 font-medium text-gray-600">Custo</th>
-            <th class="text-right px-4 py-3 font-medium text-gray-600">Venda</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="p in produtosFiltrados" :key="p.id" class="hover:bg-gray-50">
-            <td class="px-4 py-3 font-medium text-gray-800">{{ p.nome }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ p.categoria || '—' }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ p.marca || '—' }}</td>
-            <td class="px-4 py-3 text-right">
-              <span :class="estoqueClass(p)" class="font-semibold">{{ Number(p.estoque_atual) }}</span>
-            </td>
-            <td class="px-4 py-3 text-right text-gray-500">{{ Number(p.estoque_minimo) }}</td>
-            <td class="px-4 py-3 text-right text-gray-500">{{ p.preco_custo != null ? 'R$ ' + Number(p.preco_custo).toFixed(2) : '—' }}</td>
-            <td class="px-4 py-3 text-right text-gray-700">{{ p.preco_venda != null ? 'R$ ' + Number(p.preco_venda).toFixed(2) : '—' }}</td>
-            <td class="px-4 py-3">
+      <template v-else>
+        <table class="w-full text-sm hidden sm:table">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Categoria</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Marca</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Estoque</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Mínimo</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Custo</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Venda</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="p in produtosFiltrados" :key="p.id" class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-medium text-gray-800">{{ p.nome }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ p.categoria || '—' }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ p.marca || '—' }}</td>
+              <td class="px-4 py-3 text-right">
+                <span :class="estoqueClass(p)" class="font-semibold">{{ Number(p.estoque_atual) }}</span>
+              </td>
+              <td class="px-4 py-3 text-right text-gray-500">{{ Number(p.estoque_minimo) }}</td>
+              <td class="px-4 py-3 text-right text-gray-500">{{ p.preco_custo != null ? 'R$ ' + Number(p.preco_custo).toFixed(2) : '—' }}</td>
+              <td class="px-4 py-3 text-right text-gray-700">{{ p.preco_venda != null ? 'R$ ' + Number(p.preco_venda).toFixed(2) : '—' }}</td>
+              <td class="px-4 py-3">
+                <span
+                  :class="p.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                  class="text-xs px-2 py-0.5 rounded-full font-medium"
+                >{{ p.ativo ? 'Ativo' : 'Inativo' }}</span>
+              </td>
+              <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                <button @click="abrirAjuste(p)" class="text-xs text-emerald-600 hover:underline">Ajuste</button>
+                <button @click="abrirModalEditar(p)" class="text-xs text-blue-600 hover:underline">Editar</button>
+                <button @click="confirmarExclusao(p)" class="text-xs text-red-500 hover:underline">Excluir</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="sm:hidden divide-y divide-gray-100">
+          <div v-for="p in produtosFiltrados" :key="'m-' + p.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-semibold text-gray-800">{{ p.nome }}</p>
+                <p class="text-xs text-gray-500">{{ p.categoria || 'Sem categoria' }}{{ p.marca ? ' · ' + p.marca : '' }}</p>
+              </div>
               <span
                 :class="p.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                class="text-xs px-2 py-0.5 rounded-full font-medium"
+                class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
               >{{ p.ativo ? 'Ativo' : 'Inativo' }}</span>
-            </td>
-            <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-              <button @click="abrirAjuste(p)" class="text-xs text-emerald-600 hover:underline">Ajuste</button>
-              <button @click="abrirModalEditar(p)" class="text-xs text-blue-600 hover:underline">Editar</button>
-              <button @click="confirmarExclusao(p)" class="text-xs text-red-500 hover:underline">Excluir</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+            <div class="flex flex-wrap gap-3 text-xs text-gray-600">
+              <span>Estoque: <strong :class="estoqueClass(p)">{{ Number(p.estoque_atual) }}</strong> / min {{ Number(p.estoque_minimo) }}</span>
+              <span v-if="p.preco_venda != null">Venda: R$ {{ Number(p.preco_venda).toFixed(2) }}</span>
+            </div>
+            <div class="flex gap-3 pt-1">
+              <button @click="abrirAjuste(p)" class="text-sm text-emerald-600 font-medium py-2">Ajuste</button>
+              <button @click="abrirModalEditar(p)" class="text-sm text-blue-600 font-medium py-2">Editar</button>
+              <button @click="confirmarExclusao(p)" class="text-sm text-red-500 font-medium py-2">Excluir</button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Categorias -->
@@ -102,37 +127,54 @@
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div v-if="loadingCategorias" class="p-8 text-center text-sm text-gray-400">Carregando...</div>
         <div v-else-if="!categorias.length" class="p-8 text-center text-sm text-gray-400">Nenhuma categoria cadastrada.</div>
-        <table v-else class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="c in categorias" :key="c.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-medium text-gray-800">{{ c.nome }}</td>
-              <td class="px-4 py-3">
+        <template v-else>
+          <table class="w-full text-sm hidden sm:table">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr v-for="c in categorias" :key="c.id" class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-800">{{ c.nome }}</td>
+                <td class="px-4 py-3">
+                  <span :class="c.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium">
+                    {{ c.ativo ? 'Ativa' : 'Inativa' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right space-x-2">
+                  <template v-if="auth.isRecepcionistaOuAdmin">
+                    <button @click="abrirEditarCategoria(c)" class="text-xs text-blue-600 hover:underline">Editar</button>
+                    <button @click="excluirCategoria(c)" class="text-xs text-red-500 hover:underline">Excluir</button>
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="sm:hidden divide-y divide-gray-100">
+            <div v-for="c in categorias" :key="'cm-' + c.id" class="p-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold text-gray-800">{{ c.nome }}</p>
                 <span :class="c.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" class="text-xs px-2 py-0.5 rounded-full font-medium">
                   {{ c.ativo ? 'Ativa' : 'Inativa' }}
                 </span>
-              </td>
-              <td class="px-4 py-3 text-right space-x-2">
-                <template v-if="auth.isAdmin || auth.isRecepcionista">
-                  <button @click="abrirEditarCategoria(c)" class="text-xs text-blue-600 hover:underline">Editar</button>
-                  <button @click="excluirCategoria(c)" class="text-xs text-red-500 hover:underline">Excluir</button>
-                </template>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+              <div v-if="auth.isRecepcionistaOuAdmin" class="flex gap-3">
+                <button @click="abrirEditarCategoria(c)" class="text-sm text-blue-600 font-medium py-2">Editar</button>
+                <button @click="excluirCategoria(c)" class="text-sm text-red-500 font-medium py-2">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
     <!-- Modal Novo Produto -->
-    <div v-if="modalNovo" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+    <div v-if="modalNovo" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-lg sm:rounded-xl rounded-t-3xl shadow-xl p-6 max-h-[92vh] overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Novo Produto</h3>
         <form @submit.prevent="salvarNovo" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
@@ -184,8 +226,9 @@
     </div>
 
     <!-- Modal Editar Produto -->
-    <div v-if="modalEditar" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+    <div v-if="modalEditar" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-lg sm:rounded-xl rounded-t-3xl shadow-xl p-6 max-h-[92vh] overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Editar Produto</h3>
         <form @submit.prevent="salvarEdicao" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
@@ -240,8 +283,9 @@
     </div>
 
     <!-- Modal Ajuste de Estoque -->
-    <div v-if="modalAjuste" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+    <div v-if="modalAjuste" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-semibold text-gray-800 mb-1">Ajuste de Estoque</h3>
         <p class="text-sm text-gray-500 mb-4">{{ produtoAjuste?.nome }} — atual: <span class="font-semibold">{{ produtoAjuste?.estoque_atual }} un</span></p>
         <form @submit.prevent="salvarAjuste" class="space-y-3">
@@ -266,8 +310,9 @@
     </div>
 
     <!-- Confirmar Exclusão -->
-    <div v-if="produtoParaExcluir" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-xs mx-4 p-6 text-center">
+    <div v-if="produtoParaExcluir" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-4">
+      <div class="bg-white w-full sm:max-w-xs sm:rounded-xl rounded-t-3xl shadow-xl p-6 text-center pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <p class="text-sm text-gray-700 mb-1">Excluir produto</p>
         <p class="font-semibold text-gray-900 mb-6">{{ produtoParaExcluir.nome }}</p>
         <div class="flex justify-center gap-3">
@@ -280,8 +325,9 @@
     </div>
 
     <!-- Modal Categoria (nova / editar) -->
-    <div v-if="modalCategoria" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+    <div v-if="modalCategoria" class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+      <div class="bg-white w-full sm:max-w-sm sm:rounded-xl rounded-t-3xl shadow-xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
         <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ editandoCategoriaId ? 'Editar Categoria' : 'Nova Categoria' }}</h3>
         <form @submit.prevent="salvarCategoria" class="space-y-3">
           <div>
@@ -309,7 +355,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 
 defineOptions({ name: 'ProdutosView' })
 import api from '@/api/client'
@@ -322,6 +368,8 @@ const auth = useAuthStore()
 const produtos = ref([])
 const loading = ref(true)
 const salvando = ref(false)
+const lastFetchAt = ref(0)
+const STALE_MS = 5 * 60 * 1000
 
 // Filtros
 const busca = ref('')
@@ -386,6 +434,14 @@ async function fetchProdutos() {
 
 onMounted(() => {
   fetchProdutos()
+  fetchCategorias()
+  lastFetchAt.value = Date.now()
+})
+
+onActivated(() => {
+  if (!lastFetchAt.value) return
+  if (Date.now() - lastFetchAt.value < STALE_MS) return
+  fetchProdutos().then(() => { lastFetchAt.value = Date.now() })
   fetchCategorias()
 })
 

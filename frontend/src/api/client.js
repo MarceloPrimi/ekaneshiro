@@ -2,8 +2,19 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
+function resolveBaseURL() {
+  const url = import.meta.env.VITE_API_URL
+  if (url) return url
+  if (import.meta.env.PROD) {
+    throw new Error(
+      'VITE_API_URL é obrigatória em produção. Defina a URL HTTPS da API no painel da Vercel.',
+    )
+  }
+  return 'http://127.0.0.1:8000'
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000',
+  baseURL: resolveBaseURL(),
 })
 
 /** Token do Pinia ou localStorage (evita race no 1º paint após login/F5). */
