@@ -399,7 +399,9 @@
       <div
         ref="calendarPinchEl"
         class="flex-1 relative min-h-0 h-full overflow-hidden"
-        :style="isMobile ? { '--cal-zoom': String(calendarZoom) } : undefined"
+        :style="isMobile
+          ? { '--cal-zoom': String(calendarZoom), '--cal-day-min': mobileDayMinWidth() + 'px' }
+          : undefined"
       >
         <div
           class="fc-zoom-inner h-full w-full"
@@ -1732,13 +1734,9 @@ function syncCalendarForViewport() {
         ? { left: 'prev,next', center: 'title', right: 'today,timeGridWeek,listWeek' }
         : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
     )
-    if (isMobile.value) {
-      api.setOption('dayMinWidth', mobileDayMinWidth())
-      api.setOption('eventMinHeight', mobileEventMinHeight())
-    } else {
-      api.setOption('dayMinWidth', null)
-      api.setOption('eventMinHeight', 30)
-    }
+    // NÃO usar dayMinWidth — exige @fullcalendar/scrollgrid (premium) e quebra o mobile
+    // com "No ScrollGrid implementation". Scroll horizontal via CSS (--cal-day-min).
+    api.setOption('eventMinHeight', isMobile.value ? mobileEventMinHeight() : 30)
     api.updateSize()
   } catch (e) {
     console.warn('Falha ao sincronizar calendário no resize:', e)
@@ -1791,7 +1789,6 @@ function applyMobileDensityZoom() {
   const api = calendarRef.value?.getApi?.()
   if (!api) return
   try {
-    api.setOption('dayMinWidth', mobileDayMinWidth())
     api.setOption('eventMinHeight', mobileEventMinHeight())
     api.updateSize()
   } catch (e) {
@@ -2623,11 +2620,8 @@ const calendarOptions = computed(() => ({
   selectMirror: true,
   dayMaxEvents: true,
   eventMaxStack: 10,
-  // No mobile: colunas da semana com largura mínima → scroll horizontal (igual visão diária).
-  // Zoom por pinça multiplica dayMinWidth / eventMinHeight (sem CSS transform).
+  // Zoom mobile: eventMinHeight + CSS --cal-day-min (NÃO dayMinWidth — é premium).
   eventMinHeight: isMobile.value ? mobileEventMinHeight() : 30,
-  // null (não undefined) — FullCalendar trata null como “limpar opção”.
-  dayMinWidth: isMobile.value ? mobileDayMinWidth() : null,
   stickyHeaderDates: true,
   stickyFooterScrollbar: true,
   longPressDelay: 300,
@@ -4361,7 +4355,16 @@ onActivated(() => {
   .fc-wrapper .fc-col-header-cell {
     font-size: 0.7rem;
     padding: 6px 2px;
-    min-width: calc(110px * var(--cal-zoom, 1));
+    min-width: var(--cal-day-min, 110px) !important;
+  }
+  /* Scroll horizontal da semana sem dayMinWidth (plugin premium). */
+  .fc-wrapper .fc-timegrid-cols table,
+  .fc-wrapper .fc-col-header > table {
+    width: max-content !important;
+    min-width: 100%;
+  }
+  .fc-wrapper .fc-timegrid-col {
+    min-width: var(--cal-day-min, 110px) !important;
   }
   .fc-wrapper .fc-timegrid-slot-label {
     font-size: 0.65rem;
