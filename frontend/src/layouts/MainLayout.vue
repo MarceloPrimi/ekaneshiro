@@ -89,9 +89,9 @@
       <Menu class="w-5 h-5" />
     </button>
 
-    <!-- Main content -->
+    <!-- Main content — min-h-0 é obrigatório para o flex filho (calendário) ter altura real -->
     <main
-      class="flex-1 overflow-auto p-4 pt-14 sm:p-6 sm:pt-6 transition-all duration-300 ease-in-out"
+      class="flex-1 min-h-0 flex flex-col overflow-auto p-4 pt-14 sm:p-6 sm:pt-6 transition-all duration-300 ease-in-out"
       :class="[
         drawerOpen ? 'lg:ml-56' : 'lg:ml-14',
         bottomNavMinimized ? 'pb-[calc(2.5rem+env(safe-area-inset-bottom))]' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]',
@@ -103,7 +103,7 @@
            e quebra cache, fetch e a transição no mobile. -->
       <RouterView v-slot="{ Component }">
         <KeepAlive :include="KEEP_ALIVE_VIEWS">
-          <component :is="Component" />
+          <component :is="Component" class="flex-1 min-h-0" />
         </KeepAlive>
       </RouterView>
     </main>

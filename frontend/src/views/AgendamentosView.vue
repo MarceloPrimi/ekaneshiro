@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full min-h-0">
 
     <!-- Header -->
     <!-- Header compacto: busca + menu de ações unificado + botão Novo -->
@@ -315,7 +315,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════════
          CALENDÁRIO FULLCALENDAR
          ═══════════════════════════════════════════════════════════════════════════ -->
-    <div v-if="!colunaPorProfissional" class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper flex flex-col">
+    <div v-if="!colunaPorProfissional" class="flex-1 min-h-[50vh] bg-white border border-gray-200 rounded-xl overflow-hidden fc-wrapper flex flex-col">
       <!-- Barra de navegação -->
       <div class="flex items-center gap-1 px-2 sm:px-3 py-2 border-b border-gray-100 bg-gray-50/60 flex-wrap">
         <label class="text-xs text-gray-500 font-medium whitespace-nowrap hidden sm:inline">Ir para:</label>
@@ -398,7 +398,7 @@
       <!-- Desktop: transform scale. Mobile: pinça ajusta densidade (dayMinWidth/slots) sem quebrar scroll. -->
       <div
         ref="calendarPinchEl"
-        class="flex-1 relative min-h-0 overflow-hidden"
+        class="flex-1 relative min-h-0 h-full overflow-hidden"
         :style="isMobile ? { '--cal-zoom': String(calendarZoom) } : undefined"
       >
         <div
@@ -2626,13 +2626,15 @@ const calendarOptions = computed(() => ({
   // No mobile: colunas da semana com largura mínima → scroll horizontal (igual visão diária).
   // Zoom por pinça multiplica dayMinWidth / eventMinHeight (sem CSS transform).
   eventMinHeight: isMobile.value ? mobileEventMinHeight() : 30,
-  dayMinWidth: isMobile.value ? mobileDayMinWidth() : undefined,
+  // null (não undefined) — FullCalendar trata null como “limpar opção”.
+  dayMinWidth: isMobile.value ? mobileDayMinWidth() : null,
   stickyHeaderDates: true,
   stickyFooterScrollbar: true,
   longPressDelay: 300,
   weekends: true,
   firstDay: 1,
-  height: '100%',
+  // 'parent' preenche o wrapper flex; evita grade vazia quando height:100% colapsa.
+  height: 'parent',
   events: allCalendarEvents.value,
   eventClick: onEventClick,
   eventDidMount: onEventDidMount,
@@ -4041,11 +4043,18 @@ onMounted(async () => {
   } finally {
     loading.value = false
     lastFetchAt.value = Date.now()
-    // Garante dayMinWidth / scroll horizontal após o 1º paint (mobile).
+    // Garante altura/grade do FullCalendar após o 1º paint (produção + flex).
     nextTick(() => {
       syncCalendarForViewport()
       bindCalendarPinch()
       applyMobileDensityZoom()
+      // 2º passe: layout flex às vezes só estabiliza no frame seguinte.
+      requestAnimationFrame(() => {
+        try { calendarRef.value?.getApi?.()?.updateSize?.() } catch { /* noop */ }
+        setTimeout(() => {
+          try { calendarRef.value?.getApi?.()?.updateSize?.() } catch { /* noop */ }
+        }, 100)
+      })
     })
   }
 
