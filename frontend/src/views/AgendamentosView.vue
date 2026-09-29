@@ -1722,6 +1722,7 @@ onMounted(() => window.addEventListener('resize', handleResize))
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   unbindCalendarPinch()
+  unbindWeekScrollSync()
 })
 
 function syncCalendarForViewport() {
@@ -1738,6 +1739,7 @@ function syncCalendarForViewport() {
     // com "No ScrollGrid implementation". Scroll horizontal via CSS (--cal-day-min).
     api.setOption('eventMinHeight', isMobile.value ? mobileEventMinHeight() : 30)
     api.updateSize()
+    nextTick(() => bindWeekScrollSync())
   } catch (e) {
     console.warn('Falha ao sincronizar calendário no resize:', e)
   }
@@ -1791,6 +1793,7 @@ function applyMobileDensityZoom() {
   try {
     api.setOption('eventMinHeight', mobileEventMinHeight())
     api.updateSize()
+    nextTick(() => bindWeekScrollSync())
   } catch (e) {
     console.warn('Falha ao aplicar zoom mobile:', e)
   }
@@ -1892,6 +1895,53 @@ function unbindCalendarPinch() {
   el.removeEventListener('touchend', onCalendarTouchEnd)
   el.removeEventListener('touchcancel', onCalendarTouchEnd)
   pinchBoundEl = null
+}
+
+// ─── Sync scroll horizontal header ↔ body (mobile semana) ──────────────────
+// Sem @fullcalendar/scrollgrid (premium), header e grade são scrollers separados.
+// Arrastar a grade não move as datas — aplicamos translateX no header.
+let weekScrollBound = []
+let weekScrollHeaderTable = null
+
+function unbindWeekScrollSync() {
+  for (const { el, handler } of weekScrollBound) {
+    el.removeEventListener('scroll', handler)
+  }
+  weekScrollBound = []
+  if (weekScrollHeaderTable) {
+    weekScrollHeaderTable.style.transform = ''
+    weekScrollHeaderTable = null
+  }
+}
+
+function bindWeekScrollSync() {
+  unbindWeekScrollSync()
+  if (!isMobile.value) return
+  const root = calendarPinchEl.value?.querySelector?.('.fc')
+  if (!root) return
+
+  const headerTable = root.querySelector('.fc-col-header')
+  const body = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
+  if (!headerTable || !body) return
+
+  weekScrollHeaderTable = headerTable
+
+  const syncHeader = () => {
+    const x = body.scrollLeft
+    headerTable.style.transform = x ? `translate3d(${-x}px,0,0)` : ''
+  }
+
+  body.addEventListener('scroll', syncHeader, { passive: true })
+  weekScrollBound.push({ el: body, handler: syncHeader })
+  syncHeader()
+}
+
+function refreshMobileCalendarChrome() {
+  nextTick(() => {
+    bindCalendarPinch()
+    bindWeekScrollSync()
+    applyMobileDensityZoom()
+  })
 }
 
 // Toggle: mostrar ou esconder tarefas internas no calendário
@@ -2010,12 +2060,10 @@ const colunaPorProfissional = ref(false)
 watch(colunaPorProfissional, (isColuna) => {
   if (isColuna) {
     unbindCalendarPinch()
+    unbindWeekScrollSync()
     return
   }
-  nextTick(() => {
-    bindCalendarPinch()
-    applyMobileDensityZoom()
-  })
+  refreshMobileCalendarChrome()
 })
 
 // Tarefas internas
@@ -2374,6 +2422,9 @@ function onDatesSet(info) {
   const viewStart = new Date(info.start)
   filtroAno.value = viewStart.getFullYear()
   filtroMes.value = viewStart.getMonth()
+
+  // Rebind após troca de view / remount da grade (header e body são recriados).
+  nextTick(() => bindWeekScrollSync())
 
   if (fetchingRange.value || !loadedFrom.value || !loadedTo.value) return
 
@@ -2755,8 +2806,9 @@ function renderEventContent(arg) {
     }
     mostrarEstrela = todosProfissionaisNoDia.size >= 2
   }
-  const estrela = mostrarEstrela 
-    ? `<span class="fc-ev-star" style="color:#15803d" title="Múltiplos profissionais no dia">★</span>` 
+  // Estrela no rodapé do card — evita conflito com bandeirinha/check no topo.
+  const estrela = mostrarEstrela
+    ? `<span class="fc-ev-star" title="Atendimento compartilhado (mais de um profissional no dia)">★</span>`
     : ''
 
   const firstName = (s) => s ? s.split(' ')[0] : ''
@@ -2821,7 +2873,7 @@ function renderEventContent(arg) {
   // ≤ 30 min (~48px): linha única compacta
   if (durMin <= 30) {
     return {
-      html: `<div class="fc-ev-chip" data-tooltip="${tooltipText}">`
+      html: `<div class="fc-ev-chip${mostrarEstrela ? ' fc-ev-has-star' : ''}" data-tooltip="${tooltipText}">`
         + flag
         + `<span class="fc-ev-chip-name">${te(clienteDisplayCurto)}</span>`
         + (hora ? `<span class="fc-ev-chip-sep">·</span><span class="fc-ev-chip-time">${te(hora)}</span>` : '')
@@ -2834,10 +2886,11 @@ function renderEventContent(arg) {
   if (durMin <= 60) {
     const sub = [servNome, firstName(profNome)].filter(Boolean).join(' · ')
     return {
-      html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
+      html: `<div class="fc-event-inner${mostrarEstrela ? ' fc-ev-has-star' : ''}" data-tooltip="${tooltipText}">`
         + flag
-        + `<div class="fc-ev-title">${te(clienteDisplayCurto)} ${estrela}</div>`
+        + `<div class="fc-ev-title">${te(clienteDisplayCurto)}</div>`
         + (sub ? `<div class="fc-ev-sub">${te(sub)}</div>` : '')
+        + estrela
         + `</div>`,
     }
   }
@@ -2849,11 +2902,12 @@ function renderEventContent(arg) {
     .join(' + ')
   const sub2 = [firstName(profNome), hora].filter(Boolean).join(' · ')
   return {
-    html: `<div class="fc-event-inner" data-tooltip="${tooltipText}">`
+    html: `<div class="fc-event-inner${mostrarEstrela ? ' fc-ev-has-star' : ''}" data-tooltip="${tooltipText}">`
       + flag
-      + `<div class="fc-ev-title">${te(clienteNome)} ${estrela}</div>`
+      + `<div class="fc-ev-title">${te(clienteNome)}</div>`
       + (todosServicos ? `<div class="fc-ev-sub">${te(todosServicos)}</div>` : '')
       + (sub2 ? `<div class="fc-ev-sub">${te(sub2)}</div>` : '')
+      + estrela
       + `</div>`,
   }
 }
@@ -4041,12 +4095,15 @@ onMounted(async () => {
     nextTick(() => {
       syncCalendarForViewport()
       bindCalendarPinch()
+      bindWeekScrollSync()
       applyMobileDensityZoom()
       // 2º passe: layout flex às vezes só estabiliza no frame seguinte.
       requestAnimationFrame(() => {
         try { calendarRef.value?.getApi?.()?.updateSize?.() } catch { /* noop */ }
+        bindWeekScrollSync()
         setTimeout(() => {
           try { calendarRef.value?.getApi?.()?.updateSize?.() } catch { /* noop */ }
+          bindWeekScrollSync()
         }, 100)
       })
     })
@@ -4069,6 +4126,8 @@ onActivated(() => {
     } catch {
       /* calendário ainda não montado */
     }
+    bindWeekScrollSync()
+    bindCalendarPinch()
   })
 
   // HMR / estado quebrado: se loading ficou preso, libera a UI.
@@ -4097,6 +4156,30 @@ onActivated(() => {
 .fc-wrapper .fc {
   font-family: inherit;
   height: 100%;
+  /* Dia atual: laranja mais fechado para contraste (default FC é amarelo bem claro). */
+  --fc-today-bg-color: rgba(194, 65, 12, 0.28);
+}
+/* Reforço do dia atual na grade (semana/dia) e no cabeçalho. */
+.fc-wrapper .fc-day-today,
+.fc-wrapper td.fc-day-today,
+.fc-wrapper .fc-timegrid-col.fc-day-today {
+  background-color: rgba(194, 65, 12, 0.28) !important;
+}
+.fc-wrapper .fc-col-header-cell.fc-day-today {
+  background-color: rgba(194, 65, 12, 0.38) !important;
+  color: #9a3412;
+  font-weight: 700;
+}
+.fc-wrapper .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  background-color: #c2410c;
+  color: #fff;
+  border-radius: 999px;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
 }
 .fc-wrapper .fc-toolbar {
   padding: 4px 8px !important;
@@ -4191,16 +4274,32 @@ onActivated(() => {
   z-index: 5;
 }
 
-/* Estrela para múltiplos profissionais no dia — inline para não ser cortada pelo overflow */
+/* Estrela: atendimento compartilhado — ancorada no rodapé (não compete com check/flag no topo) */
 .fc-wrapper .fc-ev-star {
-  display: inline-block;
-  font-size: 0.7rem;
+  position: absolute;
+  bottom: 1px;
+  left: 3px;
+  z-index: 4;
+  display: block;
+  font-size: 0.72rem;
   line-height: 1;
   pointer-events: none;
   color: #15803d;
-  text-shadow: 0 0 2px rgba(255,255,255,0.9);
-  margin-left: 2px;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.95), 0 0 1px rgba(255, 255, 255, 0.8);
   flex-shrink: 0;
+}
+.fc-wrapper .fc-event-inner.fc-ev-has-star {
+  padding-bottom: 12px;
+}
+/* Chip curto: estrela no canto inferior direito, sem comer o nome */
+.fc-wrapper .fc-ev-chip.fc-ev-has-star {
+  padding-right: 12px;
+}
+.fc-wrapper .fc-ev-chip .fc-ev-star {
+  left: auto;
+  right: 2px;
+  bottom: 0;
+  font-size: 0.65rem;
 }
 
 /* Zoom inner wrapper */
@@ -4375,11 +4474,16 @@ onActivated(() => {
   .fc-wrapper .fc-scrollgrid {
     border-radius: 0;
   }
-  .fc-wrapper .fc-scroller {
+  /* Grade: scroll horizontal nativo. Header/footer acompanham via JS (bindWeekScrollSync). */
+  .fc-wrapper .fc-scrollgrid-section-body .fc-scroller {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     /* pan livre; pinça é tratada em JS (touchmove preventDefault com 2 dedos) */
     touch-action: pan-x pan-y;
+  }
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller,
+  .fc-wrapper .fc-scrollgrid-section-footer .fc-scroller {
+    overflow-x: hidden !important;
   }
 }
 </style>
