@@ -359,22 +359,25 @@
           @click="navegarParaHoje"
         >Hoje</button>
         
-        <!-- Controles de Zoom (desktop: botões; mobile: pinça no calendário) -->
-        <div v-if="!isMobile" class="flex items-center gap-1 ml-1">
+        <!-- Controles de Zoom (desktop + mobile — botões grandes para uso fácil) -->
+        <div class="flex items-center gap-1 ml-1">
           <button
+            type="button"
             @click="zoomOut"
-            class="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-base sm:text-sm font-bold"
+            class="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 active:bg-gray-200 text-xl sm:text-sm font-bold shadow-sm"
             title="Diminuir zoom"
             aria-label="Diminuir zoom"
           >−</button>
           <button
+            type="button"
             @click="resetZoom"
-            class="text-xs px-2 py-2 sm:px-1.5 sm:py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 min-w-[44px] sm:min-w-[40px]"
-            :title="'Zoom: ' + Math.round(calendarZoom * 100) + '%'"
+            class="text-xs px-2 py-2 sm:px-1.5 sm:py-1 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 min-w-[48px] sm:min-w-[40px] font-semibold tabular-nums"
+            :title="'Zoom: ' + Math.round(calendarZoom * 100) + '% — toque para resetar'"
           >{{ Math.round(calendarZoom * 100) }}%</button>
           <button
+            type="button"
             @click="zoomIn"
-            class="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 text-base sm:text-sm font-bold"
+            class="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 active:bg-gray-200 text-xl sm:text-sm font-bold shadow-sm"
             title="Aumentar zoom"
             aria-label="Aumentar zoom"
           >+</button>
@@ -420,13 +423,6 @@
             :options="calendarOptions"
           />
         </div>
-        <button
-          v-if="showMobileZoomBadge"
-          type="button"
-          class="absolute bottom-3 right-3 z-20 rounded-full bg-gray-900/80 text-white text-xs font-semibold px-3 py-1.5 shadow-lg backdrop-blur-sm active:scale-95 transition-transform"
-          title="Toque para resetar o zoom"
-          @click="resetZoom"
-        >{{ Math.round(calendarZoom * 100) }}%</button>
         <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white/70 z-10 pointer-events-none">
           <span class="text-sm text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">Carregando...</span>
         </div>
@@ -1751,18 +1747,27 @@ const showNovoMenu = ref(false)
 
 // ─── Zoom ──────────────────────────────────────────────────────────────────
 // Desktop: CSS transform (effectiveCalendarZoom).
-// Mobile: pinça ajusta densidade do FullCalendar (colunas/slots) — scroll nativo intacto.
+// Mobile: botões (+/−/%) e pinça ajustam densidade (colunas/slots) — scroll nativo intacto.
 const ZOOM_STORAGE_KEY = 'sgk_calendar_zoom'
-const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2]
-const ZOOM_MIN = 0.55
-const ZOOM_MAX = 1.75
-const MOBILE_DAY_MIN_BASE = 110
-const MOBILE_EVENT_MIN_PHONE = 44
-const MOBILE_EVENT_MIN_TABLET = 36
+const ZOOM_LEVELS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5]
+const ZOOM_MIN = 0.8
+const ZOOM_MAX = 1.5
+const MOBILE_DAY_MIN_BASE = 132
+const MOBILE_EVENT_MIN_PHONE = 48
+const MOBILE_EVENT_MIN_TABLET = 40
 
 function loadInitialZoom() {
   const saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY))
   if (Number.isFinite(saved) && saved >= ZOOM_MIN && saved <= ZOOM_MAX) return saved
+  // Zoom antigo muito baixo (ex.: 55%) — sobe para legível.
+  if (Number.isFinite(saved) && saved < ZOOM_MIN) {
+    localStorage.setItem(ZOOM_STORAGE_KEY, String(ZOOM_MIN))
+    return ZOOM_MIN
+  }
+  if (Number.isFinite(saved) && saved > ZOOM_MAX) {
+    localStorage.setItem(ZOOM_STORAGE_KEY, String(ZOOM_MAX))
+    return ZOOM_MAX
+  }
   return 1
 }
 const calendarZoom = ref(loadInitialZoom())
@@ -1770,16 +1775,13 @@ const pinchActive = ref(false)
 const calendarPinchEl = ref(null)
 /** Transform CSS só no desktop — no mobile quebra o scroll horizontal da semana. */
 const effectiveCalendarZoom = computed(() => (isMobile.value ? 1 : calendarZoom.value))
-const showMobileZoomBadge = computed(() =>
-  isMobile.value && (pinchActive.value || Math.abs(calendarZoom.value - 1) > 0.02),
-)
 
 function mobileDayMinWidth() {
   return Math.round(MOBILE_DAY_MIN_BASE * calendarZoom.value)
 }
 function mobileEventMinHeight() {
   const base = isPhone.value ? MOBILE_EVENT_MIN_PHONE : MOBILE_EVENT_MIN_TABLET
-  return Math.max(28, Math.round(base * calendarZoom.value))
+  return Math.max(32, Math.round(base * calendarZoom.value))
 }
 
 function persistZoom() {
@@ -1899,19 +1901,16 @@ function unbindCalendarPinch() {
 
 // ─── Sync scroll horizontal header ↔ body (mobile semana) ──────────────────
 // Sem @fullcalendar/scrollgrid (premium), header e grade são scrollers separados.
-// Arrastar a grade não move as datas — aplicamos translateX no header.
+// Usa scrollLeft (não transform) para não quebrar sticky do eixo de horas.
 let weekScrollBound = []
-let weekScrollHeaderTable = null
+let weekScrollSyncLock = false
 
 function unbindWeekScrollSync() {
   for (const { el, handler } of weekScrollBound) {
     el.removeEventListener('scroll', handler)
   }
   weekScrollBound = []
-  if (weekScrollHeaderTable) {
-    weekScrollHeaderTable.style.transform = ''
-    weekScrollHeaderTable = null
-  }
+  weekScrollSyncLock = false
 }
 
 function bindWeekScrollSync() {
@@ -1920,20 +1919,29 @@ function bindWeekScrollSync() {
   const root = calendarPinchEl.value?.querySelector?.('.fc')
   if (!root) return
 
-  const headerTable = root.querySelector('.fc-col-header')
-  const body = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
-  if (!headerTable || !body) return
+  const headerScroller = root.querySelector('.fc-col-header')?.closest('.fc-scroller')
+  const bodyScroller = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
+  if (!headerScroller || !bodyScroller) return
 
-  weekScrollHeaderTable = headerTable
-
-  const syncHeader = () => {
-    const x = body.scrollLeft
-    headerTable.style.transform = x ? `translate3d(${-x}px,0,0)` : ''
+  const syncFrom = (source, target) => {
+    if (weekScrollSyncLock) return
+    weekScrollSyncLock = true
+    if (target.scrollLeft !== source.scrollLeft) target.scrollLeft = source.scrollLeft
+    requestAnimationFrame(() => { weekScrollSyncLock = false })
   }
 
-  body.addEventListener('scroll', syncHeader, { passive: true })
-  weekScrollBound.push({ el: body, handler: syncHeader })
-  syncHeader()
+  const onBody = () => syncFrom(bodyScroller, headerScroller)
+  const onHeader = () => syncFrom(headerScroller, bodyScroller)
+  bodyScroller.addEventListener('scroll', onBody, { passive: true })
+  headerScroller.addEventListener('scroll', onHeader, { passive: true })
+  weekScrollBound.push(
+    { el: bodyScroller, handler: onBody },
+    { el: headerScroller, handler: onHeader },
+  )
+  // Alinha de imediato (ex.: após zoom/resize).
+  if (headerScroller.scrollLeft !== bodyScroller.scrollLeft) {
+    headerScroller.scrollLeft = bodyScroller.scrollLeft
+  }
 }
 
 function refreshMobileCalendarChrome() {
@@ -4157,17 +4165,17 @@ onActivated(() => {
   font-family: inherit;
   height: 100%;
   /* Dia atual: laranja mais fechado para contraste (default FC é amarelo bem claro). */
-  --fc-today-bg-color: rgba(194, 65, 12, 0.28);
+  --fc-today-bg-color: rgba(194, 65, 12, 0.34);
 }
 /* Reforço do dia atual na grade (semana/dia) e no cabeçalho. */
 .fc-wrapper .fc-day-today,
 .fc-wrapper td.fc-day-today,
 .fc-wrapper .fc-timegrid-col.fc-day-today {
-  background-color: rgba(194, 65, 12, 0.28) !important;
+  background-color: rgba(194, 65, 12, 0.34) !important;
 }
 .fc-wrapper .fc-col-header-cell.fc-day-today {
-  background-color: rgba(194, 65, 12, 0.38) !important;
-  color: #9a3412;
+  background-color: rgba(194, 65, 12, 0.48) !important;
+  color: #7c2d12;
   font-weight: 700;
 }
 .fc-wrapper .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
@@ -4451,19 +4459,34 @@ onActivated(() => {
   .fc-wrapper .fc-timegrid-slot {
     height: calc(2.75rem * var(--cal-zoom, 1)) !important;
   }
-  .fc-wrapper .fc-col-header-cell {
+  /* min-width SÓ nos dias — NÃO no eixo de horas (senão datas e grade desalinhham). */
+  .fc-wrapper .fc-col-header-cell.fc-day {
     font-size: 0.7rem;
     padding: 6px 2px;
-    min-width: var(--cal-day-min, 110px) !important;
+    min-width: var(--cal-day-min, 132px) !important;
+  }
+  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
+    min-width: 42px !important;
+    width: 42px !important;
+    max-width: 42px !important;
   }
   /* Scroll horizontal da semana sem dayMinWidth (plugin premium). */
-  .fc-wrapper .fc-timegrid-cols table,
-  .fc-wrapper .fc-col-header > table {
+  .fc-wrapper table.fc-col-header,
+  .fc-wrapper .fc-timegrid-cols > table {
     width: max-content !important;
     min-width: 100%;
   }
-  .fc-wrapper .fc-timegrid-col {
-    min-width: var(--cal-day-min, 110px) !important;
+  .fc-wrapper .fc-timegrid-col.fc-day {
+    min-width: var(--cal-day-min, 132px) !important;
+  }
+  /* Eixo de horas fixo ao arrastar pro lado. */
+  .fc-wrapper .fc-timegrid-axis,
+  .fc-wrapper .fc-timegrid-slot-label,
+  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #fff;
   }
   .fc-wrapper .fc-timegrid-slot-label {
     font-size: 0.65rem;
@@ -4474,16 +4497,19 @@ onActivated(() => {
   .fc-wrapper .fc-scrollgrid {
     border-radius: 0;
   }
-  /* Grade: scroll horizontal nativo. Header/footer acompanham via JS (bindWeekScrollSync). */
+  /* Header e grade rolam juntos (sync via bindWeekScrollSync). */
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller,
   .fc-wrapper .fc-scrollgrid-section-body .fc-scroller {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    /* pan livre; pinça é tratada em JS (touchmove preventDefault com 2 dedos) */
     touch-action: pan-x pan-y;
   }
-  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller,
-  .fc-wrapper .fc-scrollgrid-section-footer .fc-scroller {
-    overflow-x: hidden !important;
+  /* Esconde barra do header — o body conduz o gesto. */
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller {
+    scrollbar-width: none;
+  }
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller::-webkit-scrollbar {
+    display: none;
   }
 }
 </style>
