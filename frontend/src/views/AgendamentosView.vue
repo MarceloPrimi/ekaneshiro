@@ -1920,13 +1920,15 @@ function unbindCalendarPinch() {
   pinchBoundEl = null
 }
 
-// ─── Sync scroll horizontal header ↔ body (mobile semana) ──────────────────
-// Sem @fullcalendar/scrollgrid (premium), header e grade são scrollers separados.
-// scrollLeft (não transform): sticky do eixo de horas continua funcionando.
+// ─── Sync scroll + eixo de horas fixo (mobile semana) ──────────────────────
+// Sticky em <td> quebra no harness do FullCalendar. Overlay absoluto no harness
+// fica fixo na horizontal e acompanha só o scroll vertical.
+const TIME_AXIS_W = 42
 let weekScrollBound = []
 let weekScrollRaf = 0
-let weekScrollHeaderScroller = null
-let weekScrollBodyScroller = null
+let weekAxisInner = null
+let weekAxisOverlay = null
+let weekHeaderCorner = null
 
 function unbindWeekScrollSync() {
   for (const { el, handler } of weekScrollBound) {
@@ -1937,11 +1939,20 @@ function unbindWeekScrollSync() {
     cancelAnimationFrame(weekScrollRaf)
     weekScrollRaf = 0
   }
-  weekScrollHeaderScroller = null
-  weekScrollBodyScroller = null
+  weekAxisInner = null
+  if (weekAxisOverlay) {
+    weekAxisOverlay.remove()
+    weekAxisOverlay = null
+  }
+  if (weekHeaderCorner) {
+    weekHeaderCorner.remove()
+    weekHeaderCorner = null
+  }
+  const root = calendarPinchEl.value?.querySelector?.('.fc')
+  root?.classList?.remove('sgk-mobile-axis')
 }
 
-/** Alinha largura das linhas de hora com as colunas dos dias (senão somem ao rolar). */
+/** Alinha largura das linhas de hora com as colunas dos dias. */
 function syncMobileTimegridWidths(root) {
   const body = root?.querySelector?.('.fc-timegrid-body')
   const colsTable = root?.querySelector?.('.fc-timegrid-cols > table')
@@ -1949,11 +1960,10 @@ function syncMobileTimegridWidths(root) {
   const headerTable = root?.querySelector?.('table.fc-col-header')
   if (!body || !colsTable) return
 
-  const axisW = 42
   const dayCols = colsTable.querySelectorAll('.fc-timegrid-col.fc-day')
   const dayCount = dayCols.length || 7
   const dayMin = mobileDayMinWidth()
-  const total = Math.max(axisW + dayCount * dayMin, body.clientWidth || 0)
+  const total = Math.max(TIME_AXIS_W + dayCount * dayMin, body.clientWidth || 0)
 
   body.style.width = `${total}px`
   body.style.minWidth = `${total}px`
@@ -1968,25 +1978,82 @@ function syncMobileTimegridWidths(root) {
   }
 }
 
+function buildTimeAxisOverlay(root, bodyScroller) {
+  const harness = bodyScroller?.parentElement
+  if (!harness || !harness.classList.contains('fc-scroller-harness')) return
+
+  let overlay = harness.querySelector('.sgk-time-axis-overlay')
+  if (!overlay) {
+    overlay = document.createElement('div')
+    overlay.className = 'sgk-time-axis-overlay'
+    overlay.setAttribute('aria-hidden', 'true')
+    harness.appendChild(overlay)
+  }
+
+  const inner = document.createElement('div')
+  inner.className = 'sgk-time-axis-overlay-inner'
+
+  const rows = root.querySelectorAll('.fc-timegrid-slots tr')
+  rows.forEach((tr) => {
+    const row = document.createElement('div')
+    row.className = 'sgk-time-axis-row'
+    const h = tr.getBoundingClientRect().height
+    if (h > 0) row.style.height = `${h}px`
+    const text = tr.querySelector('.fc-timegrid-slot-label-cushion')?.textContent?.trim() || ''
+    if (text) {
+      const span = document.createElement('span')
+      span.textContent = text
+      row.appendChild(span)
+    }
+    inner.appendChild(row)
+  })
+
+  overlay.replaceChildren(inner)
+  weekAxisOverlay = overlay
+  weekAxisInner = inner
+  inner.style.transform = `translate3d(0,${-bodyScroller.scrollTop}px,0)`
+}
+
+function buildHeaderAxisCorner(headerScroller) {
+  const harness = headerScroller?.parentElement
+  if (!harness || !harness.classList.contains('fc-scroller-harness')) return
+
+  let corner = harness.querySelector('.sgk-time-axis-header-corner')
+  if (!corner) {
+    corner = document.createElement('div')
+    corner.className = 'sgk-time-axis-header-corner'
+    corner.setAttribute('aria-hidden', 'true')
+    harness.appendChild(corner)
+  }
+  weekHeaderCorner = corner
+}
+
 function bindWeekScrollSync() {
   unbindWeekScrollSync()
   if (!isMobile.value) return
   const root = calendarPinchEl.value?.querySelector?.('.fc')
   if (!root) return
 
+  root.classList.add('sgk-mobile-axis')
   syncMobileTimegridWidths(root)
 
   const headerScroller = root.querySelector('table.fc-col-header')?.closest('.fc-scroller')
   const bodyScroller = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
   if (!headerScroller || !bodyScroller) return
 
-  weekScrollHeaderScroller = headerScroller
-  weekScrollBodyScroller = bodyScroller
+  // Overlay depois do layout estabilizar (alturas das rows).
+  requestAnimationFrame(() => {
+    syncMobileTimegridWidths(root)
+    buildTimeAxisOverlay(root, bodyScroller)
+    buildHeaderAxisCorner(headerScroller)
+  })
 
   const apply = () => {
     weekScrollRaf = 0
     const x = bodyScroller.scrollLeft
+    const y = bodyScroller.scrollTop
     if (headerScroller.scrollLeft !== x) headerScroller.scrollLeft = x
+    if (weekAxisInner) weekAxisInner.style.transform = `translate3d(0,${-y}px,0)`
   }
 
   const onBodyScroll = () => {
@@ -4565,42 +4632,59 @@ onActivated(() => {
   .fc-wrapper .fc-timegrid-col.fc-day {
     min-width: var(--cal-day-min, 100px) !important;
   }
-  /* Eixo de horas sempre visível à esquerda ao arrastar. */
-  .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,
-  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis,
-  .fc-wrapper .fc-timegrid-slot-label {
-    position: sticky !important;
-    left: 0 !important;
-    z-index: 8 !important;
-    background: #fff !important;
-    background-clip: padding-box;
-  }
-  .fc-wrapper .fc-timegrid-slot-label,
-  .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,
-  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
+  /* Espaço do eixo nativo (labels somem — overlay assume). */
+  .fc-wrapper .fc.sgk-mobile-axis .fc-timegrid-slot-label,
+  .fc-wrapper .fc.sgk-mobile-axis .fc-timegrid-col.fc-timegrid-axis,
+  .fc-wrapper .fc.sgk-mobile-axis .fc-col-header-cell.fc-timegrid-axis {
     min-width: 42px !important;
     width: 42px !important;
     max-width: 42px !important;
-    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
   }
-  .fc-wrapper .fc-timegrid-slot-label {
-    font-size: 0.65rem;
-    z-index: 7 !important;
+  .fc-wrapper .fc.sgk-mobile-axis .fc-timegrid-slot-label-cushion,
+  .fc-wrapper .fc.sgk-mobile-axis .fc-col-header-cell.fc-timegrid-axis .fc-scrollgrid-shrink-cushion {
+    visibility: hidden !important;
   }
-  /* Fallback: sticky no cushion interno (td sticky falha em alguns WebKits). */
-  .fc-wrapper .fc-timegrid-slot-label-frame {
-    position: sticky;
+  /* Overlay fixo: horários sempre à esquerda, independente do pan. */
+  .fc-wrapper .sgk-time-axis-overlay {
+    position: absolute;
     left: 0;
-    z-index: 7;
+    top: 0;
+    bottom: 0;
+    width: 42px;
+    z-index: 30;
+    overflow: hidden;
     background: #fff;
-    min-width: 42px;
-    display: flex;
-    justify-content: flex-end;
-    padding-right: 4px;
+    pointer-events: none;
+    box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
+    border-right: 1px solid #e5e7eb;
   }
-  .fc-wrapper .fc-timegrid-slot-label-cushion {
-    position: relative;
-    z-index: 1;
+  .fc-wrapper .sgk-time-axis-overlay-inner {
+    will-change: transform;
+  }
+  .fc-wrapper .sgk-time-axis-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    padding: 1px 5px 0 0;
+  }
+  .fc-wrapper .sgk-time-axis-row span {
+    font-size: 0.65rem;
+    line-height: 1.1;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  .fc-wrapper .sgk-time-axis-header-corner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 42px;
+    z-index: 30;
+    background: #fff;
+    pointer-events: none;
+    border-right: 1px solid #e5e7eb;
+    box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
   }
   .fc-wrapper .fc-event {
     border-radius: 6px !important;
@@ -4608,7 +4692,7 @@ onActivated(() => {
   .fc-wrapper .fc-scrollgrid {
     border-radius: 0;
   }
-  /* Grade rola; header acompanha via scrollLeft (mantém sticky do eixo). */
+  /* Grade rola; header acompanha via scrollLeft. */
   .fc-wrapper .fc-scrollgrid-section-body .fc-scroller,
   .fc-wrapper .fc-scrollgrid-section-header .fc-scroller {
     overflow-x: auto !important;
