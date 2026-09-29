@@ -844,7 +844,7 @@
               <p class="text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">{{ detalheAg.observacoes }}</p>
             </div>
 
-            <button @click="abrirModalEditar(detalheAg); detalheAg = null" class="w-full bg-rose-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-rose-700 transition-colors mb-2">
+            <button @click="abrirModalEditar(detalheAg)" class="w-full bg-rose-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-rose-700 transition-colors mb-2">
               Editar Agendamento
             </button>
             <button
@@ -1531,32 +1531,48 @@
       <div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl shadow-2xl p-6 flex flex-col gap-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div class="sm:hidden w-10 h-1 bg-gray-300 rounded-full mx-auto"></div>
         <h3 class="text-base font-bold text-gray-800">
-          {{ formFeriado.id ? 'Editar Feriado' : 'Novo Feriado / Dia Bloqueado' }}
+          {{ formFeriado.id ? 'Editar Feriado' : 'Novo Feriado / Recesso' }}
         </h3>
-        <div>
-          <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Data</label>
-          <input
-            v-model="formFeriado.data"
-            type="date"
-            :disabled="!!formFeriado.id"
-            class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:bg-gray-50 disabled:text-gray-400"
-          />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+              {{ formFeriado.id ? 'Data' : 'Data início' }}
+            </label>
+            <input
+              v-model="formFeriado.data"
+              type="date"
+              :disabled="!!formFeriado.id"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+          </div>
+          <div v-if="!formFeriado.id">
+            <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Data fim</label>
+            <input
+              v-model="formFeriado.data_fim"
+              type="date"
+              :min="formFeriado.data || undefined"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+          </div>
         </div>
+        <p v-if="!formFeriado.id" class="text-xs text-gray-500 -mt-2">
+          Deixe “Data fim” igual ou vazia para um único dia. Preencha o intervalo para bloquear vários dias de uma vez (ex.: recesso).
+        </p>
         <div>
           <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Nome / Descrição</label>
           <input
             v-model="formFeriado.nome"
             type="text"
-            placeholder="Ex: Natal, Feriado municipal..."
+            placeholder="Ex: Natal, Recesso de Ano Novo..."
             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
           />
         </div>
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input v-model="formFeriado.bloquear_agenda" type="checkbox" class="w-4 h-4 accent-rose-600" />
-          <span class="text-sm text-gray-700">Bloquear agenda neste dia</span>
+          <span class="text-sm text-gray-700">Bloquear agenda neste período</span>
         </label>
         <p v-if="formFeriado.bloquear_agenda" class="text-xs text-rose-600 -mt-2 pl-7">
-          Nenhum agendamento poderá ser criado nesta data.
+          Nenhum agendamento poderá ser criado nessas datas (todos os profissionais).
         </p>
         <p v-if="erroFeriado" class="text-sm text-red-500">{{ erroFeriado }}</p>
         <div class="flex gap-2 pt-1">
@@ -1749,17 +1765,17 @@ const showNovoMenu = ref(false)
 // Desktop: CSS transform (effectiveCalendarZoom).
 // Mobile: botões (+/−/%) e pinça ajustam densidade (colunas/slots) — scroll nativo intacto.
 const ZOOM_STORAGE_KEY = 'sgk_calendar_zoom'
-const ZOOM_LEVELS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5]
-const ZOOM_MIN = 0.8
+// Mobile precisa de zoom-out maior para ver mais horas/dias na tela.
+const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5]
+const ZOOM_MIN = 0.5
 const ZOOM_MAX = 1.5
-const MOBILE_DAY_MIN_BASE = 132
-const MOBILE_EVENT_MIN_PHONE = 48
-const MOBILE_EVENT_MIN_TABLET = 40
+const MOBILE_DAY_MIN_BASE = 100
+const MOBILE_EVENT_MIN_PHONE = 36
+const MOBILE_EVENT_MIN_TABLET = 32
 
 function loadInitialZoom() {
   const saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY))
   if (Number.isFinite(saved) && saved >= ZOOM_MIN && saved <= ZOOM_MAX) return saved
-  // Zoom antigo muito baixo (ex.: 55%) — sobe para legível.
   if (Number.isFinite(saved) && saved < ZOOM_MIN) {
     localStorage.setItem(ZOOM_STORAGE_KEY, String(ZOOM_MIN))
     return ZOOM_MIN
@@ -1777,11 +1793,12 @@ const calendarPinchEl = ref(null)
 const effectiveCalendarZoom = computed(() => (isMobile.value ? 1 : calendarZoom.value))
 
 function mobileDayMinWidth() {
-  return Math.round(MOBILE_DAY_MIN_BASE * calendarZoom.value)
+  // No zoom-out, colunas mais estreitas → mais dias/horas na tela.
+  return Math.max(72, Math.round(MOBILE_DAY_MIN_BASE * calendarZoom.value))
 }
 function mobileEventMinHeight() {
   const base = isPhone.value ? MOBILE_EVENT_MIN_PHONE : MOBILE_EVENT_MIN_TABLET
-  return Math.max(32, Math.round(base * calendarZoom.value))
+  return Math.max(22, Math.round(base * calendarZoom.value))
 }
 
 function persistZoom() {
@@ -2086,7 +2103,7 @@ const feriados = ref([])
 const showModalFeriado = ref(false)
 const savingFeriado = ref(false)
 const erroFeriado = ref('')
-const formFeriado = ref({ id: null, data: '', nome: '', bloquear_agenda: false })
+const formFeriado = ref({ id: null, data: '', data_fim: '', nome: '', bloquear_agenda: false })
 const showModalTarefa = ref(false)
 const modalTarefaMode = ref('create')
 const savingTarefa = ref(false)
@@ -3060,19 +3077,23 @@ function abrirModalNovo(dt = '', profId = null) {
 }
 
 function abrirModalEditar(ag) {
+  if (!ag) return
   modalMode.value = 'edit'
+  const itens = Array.isArray(ag.itens) ? ag.itens : []
   formData.value = {
     id: ag.id,
-    cliente_id: ag.cliente_id,
+    cliente_id: ag.cliente_id ?? ag.cliente?.id ?? '',
     cor_hex: ag.cor_hex || null,
     observacoes: ag.observacoes || '',
-    itens: ag.itens.map(i => ({
-      servico_id: i.servico?.id ?? i.servico_id,
-      servico_busca: i.servico?.nome ?? '',
-      profissional_id: i.profissional?.id ?? i.profissional_id,
-      data_hora_inicio: toDatetimeLocal(i.data_hora_inicio),
-      data_hora_fim: toDatetimeLocal(i.data_hora_fim),
-    })),
+    itens: itens.length
+      ? itens.map(i => ({
+          servico_id: i.servico?.id ?? i.servico_id ?? '',
+          servico_busca: i.servico?.nome ?? '',
+          profissional_id: i.profissional?.id ?? i.profissional_id ?? '',
+          data_hora_inicio: toDatetimeLocal(i.data_hora_inicio),
+          data_hora_fim: toDatetimeLocal(i.data_hora_fim),
+        }))
+      : [emptyItem()],
     recurrence: rruleToFreq(ag.recurrence_rule),
     recurrence_count: rruleToCount(ag.recurrence_rule),
     edit_scope: 'this',
@@ -3081,7 +3102,9 @@ function abrirModalEditar(ag) {
   clienteBuscaNome.value = ag.cliente?.nome || ''
   modalError.value = ''
   sugestaoItemIdx.value = -1
-  showModal.value = true
+  // Fecha o detalhe antes de abrir o form — evita race no mobile (tela branca).
+  detalheAg.value = null
+  nextTick(() => { showModal.value = true })
 }
 
 function addItem() {
@@ -3199,7 +3222,10 @@ const conflictosPorItem = computed(() => {
       if (!other.data_hora_inicio || !other.data_hora_fim) continue
       const oInicio = new Date(other.data_hora_inicio)
       const oFim = new Date(other.data_hora_fim)
-      if (inicio < oFim && fim > oInicio) { return `Atenção: sobreposição com Serviço ${i + 1} (${otherServ?.nome ?? '—'}).` }
+      if (inicio < oFim && fim > oInicio) {
+        const otherServ = servicos.value.find(s => s.id === Number(other.servico_id))
+        return `Atenção: sobreposição com Serviço ${i + 1} (${otherServ?.nome ?? '—'}).`
+      }
     }
 
     return null
@@ -3471,13 +3497,13 @@ function feriadoBloqueadoNaData(dataStr) {
 }
 
 function abrirModalFeriado(dataStr = '') {
-  formFeriado.value = { id: null, data: dataStr, nome: '', bloquear_agenda: false }
+  formFeriado.value = { id: null, data: dataStr, data_fim: dataStr, nome: '', bloquear_agenda: true }
   erroFeriado.value = ''
   showModalFeriado.value = true
 }
 
 function abrirModalEditarFeriado(f) {
-  formFeriado.value = { id: f.id, data: f.data, nome: f.nome, bloquear_agenda: f.bloquear_agenda }
+  formFeriado.value = { id: f.id, data: f.data, data_fim: '', nome: f.nome, bloquear_agenda: f.bloquear_agenda }
   erroFeriado.value = ''
   showModalFeriado.value = true
 }
@@ -3497,18 +3523,42 @@ async function salvarFeriado() {
       })
       const idx = feriados.value.findIndex(f => f.id === data.id)
       if (idx >= 0) feriados.value[idx] = data
+      toastSucesso('Feriado salvo!')
     } else {
-      const { data } = await api.post('/feriados/', {
-        data: formFeriado.value.data,
-        nome: formFeriado.value.nome,
-        bloquear_agenda: formFeriado.value.bloquear_agenda,
-      })
-      feriados.value = [...feriados.value, data].sort((a, b) => a.data.localeCompare(b.data))
+      const inicio = formFeriado.value.data
+      const fim = formFeriado.value.data_fim || inicio
+      if (fim < inicio) {
+        erroFeriado.value = 'Data fim deve ser maior ou igual à data início.'
+        return
+      }
+      // Um dia: endpoint simples. Intervalo: bloqueia em lote.
+      if (fim === inicio) {
+        const { data } = await api.post('/feriados/', {
+          data: inicio,
+          nome: formFeriado.value.nome,
+          bloquear_agenda: formFeriado.value.bloquear_agenda,
+        })
+        feriados.value = [...feriados.value, data].sort((a, b) => a.data.localeCompare(b.data))
+        toastSucesso('Feriado salvo!')
+      } else {
+        const { data } = await api.post('/feriados/periodo', {
+          data_inicio: inicio,
+          data_fim: fim,
+          nome: formFeriado.value.nome,
+          bloquear_agenda: formFeriado.value.bloquear_agenda,
+        })
+        const mapa = new Map(feriados.value.map(f => [f.id, f]))
+        for (const f of [...(data.criados || []), ...(data.atualizados || [])]) {
+          mapa.set(f.id, f)
+        }
+        feriados.value = Array.from(mapa.values()).sort((a, b) => a.data.localeCompare(b.data))
+        toastSucesso(`Recesso aplicado em ${data.total_dias} dia(s)!`)
+      }
     }
     showModalFeriado.value = false
-    toastSucesso('Feriado salvo!')
   } catch (e) {
-    erroFeriado.value = e.response?.data?.detail || 'Erro ao salvar feriado.'
+    const detail = e.response?.data?.detail
+    erroFeriado.value = typeof detail === 'string' ? detail : 'Erro ao salvar feriado.'
   } finally {
     savingFeriado.value = false
   }
@@ -4463,13 +4513,13 @@ onActivated(() => {
     gap: 2px;
   }
   .fc-wrapper .fc-timegrid-slot {
-    height: calc(2.75rem * var(--cal-zoom, 1)) !important;
+    height: calc(2.35rem * var(--cal-zoom, 1)) !important;
   }
   /* min-width SÓ nos dias — NÃO no eixo de horas (senão datas e grade desalinhham). */
   .fc-wrapper .fc-col-header-cell.fc-day {
     font-size: 0.7rem;
     padding: 6px 2px;
-    min-width: var(--cal-day-min, 132px) !important;
+    min-width: var(--cal-day-min, 100px) !important;
   }
   .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
     min-width: 42px !important;
@@ -4483,7 +4533,7 @@ onActivated(() => {
     min-width: 100%;
   }
   .fc-wrapper .fc-timegrid-col.fc-day {
-    min-width: var(--cal-day-min, 132px) !important;
+    min-width: var(--cal-day-min, 100px) !important;
   }
   /* Eixo de horas fixo: sticky na coluna + labels (poucas células; o lag vinha do scrollLeft). */
   .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,

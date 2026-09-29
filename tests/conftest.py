@@ -68,14 +68,15 @@ def client(db):
 def criar_usuario(
     db,
     nome: str = "Usuário",
-    email: str = "user@sgk.com",
+    username: str = "user",
+    email: str | None = None,  # alias legado dos testes
     password: str = "Senha@123",
     role: RoleEnum = RoleEnum.admin,
     ativo: bool = True,
 ) -> Usuario:
     u = Usuario(
         nome=nome,
-        email=email,
+        username=username or (email.split("@")[0] if email else "user"),
         hashed_password=hash_password(password),
         role=role,
         ativo=ativo,
@@ -87,7 +88,7 @@ def criar_usuario(
 
 
 def token_para(user: Usuario) -> dict:
-    token = create_access_token({"sub": user.email, "role": user.role.value})
+    token = create_access_token({"sub": user.username, "role": user.role.value})
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -126,12 +127,12 @@ def habilitar_servico(db, profissional_id: int, servico_id: int) -> None:
 
 @pytest.fixture()
 def admin(db):
-    return criar_usuario(db, nome="Admin", email="admin@sgk.com", role=RoleEnum.admin)
+    return criar_usuario(db, nome="Admin", username="admin", email="admin@sgk.com", role=RoleEnum.admin)
 
 
 @pytest.fixture()
 def recepcionista(db):
-    return criar_usuario(db, nome="Recep", email="recep@sgk.com", role=RoleEnum.recepcionista)
+    return criar_usuario(db, nome="Recep", username="recep", email="recep@sgk.com", role=RoleEnum.recepcionista)
 
 
 @pytest.fixture()
