@@ -1812,7 +1812,11 @@ function applyMobileDensityZoom() {
   try {
     api.setOption('eventMinHeight', mobileEventMinHeight())
     api.updateSize()
-    nextTick(() => bindWeekScrollSync())
+    nextTick(() => {
+      const root = calendarPinchEl.value?.querySelector?.('.fc')
+      syncMobileTimegridWidths(root)
+      bindWeekScrollSync()
+    })
   } catch (e) {
     console.warn('Falha ao aplicar zoom mobile:', e)
   }
@@ -1918,10 +1922,11 @@ function unbindCalendarPinch() {
 
 // ─── Sync scroll horizontal header ↔ body (mobile semana) ──────────────────
 // Sem @fullcalendar/scrollgrid (premium), header e grade são scrollers separados.
-// Transform + rAF (GPU) — scrollLeft a cada frame deixa o arraste lagado.
+// scrollLeft (não transform): sticky do eixo de horas continua funcionando.
 let weekScrollBound = []
 let weekScrollRaf = 0
-let weekScrollHeaderTable = null
+let weekScrollHeaderScroller = null
+let weekScrollBodyScroller = null
 
 function unbindWeekScrollSync() {
   for (const { el, handler } of weekScrollBound) {
@@ -1932,9 +1937,34 @@ function unbindWeekScrollSync() {
     cancelAnimationFrame(weekScrollRaf)
     weekScrollRaf = 0
   }
-  if (weekScrollHeaderTable) {
-    weekScrollHeaderTable.style.transform = ''
-    weekScrollHeaderTable = null
+  weekScrollHeaderScroller = null
+  weekScrollBodyScroller = null
+}
+
+/** Alinha largura das linhas de hora com as colunas dos dias (senão somem ao rolar). */
+function syncMobileTimegridWidths(root) {
+  const body = root?.querySelector?.('.fc-timegrid-body')
+  const colsTable = root?.querySelector?.('.fc-timegrid-cols > table')
+  const slotsTable = root?.querySelector?.('.fc-timegrid-slots > table')
+  const headerTable = root?.querySelector?.('table.fc-col-header')
+  if (!body || !colsTable) return
+
+  const axisW = 42
+  const dayCols = colsTable.querySelectorAll('.fc-timegrid-col.fc-day')
+  const dayCount = dayCols.length || 7
+  const dayMin = mobileDayMinWidth()
+  const total = Math.max(axisW + dayCount * dayMin, body.clientWidth || 0)
+
+  body.style.width = `${total}px`
+  body.style.minWidth = `${total}px`
+  colsTable.style.width = `${total}px`
+  if (slotsTable) {
+    slotsTable.style.width = `${total}px`
+    slotsTable.style.minWidth = `${total}px`
+  }
+  if (headerTable) {
+    headerTable.style.width = `${total}px`
+    headerTable.style.minWidth = `${total}px`
   }
 }
 
@@ -1944,20 +1974,22 @@ function bindWeekScrollSync() {
   const root = calendarPinchEl.value?.querySelector?.('.fc')
   if (!root) return
 
-  const headerTable = root.querySelector('table.fc-col-header')
-  const bodyScroller = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
-  if (!headerTable || !bodyScroller) return
+  syncMobileTimegridWidths(root)
 
-  weekScrollHeaderTable = headerTable
+  const headerScroller = root.querySelector('table.fc-col-header')?.closest('.fc-scroller')
+  const bodyScroller = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
+  if (!headerScroller || !bodyScroller) return
+
+  weekScrollHeaderScroller = headerScroller
+  weekScrollBodyScroller = bodyScroller
 
   const apply = () => {
     weekScrollRaf = 0
-    const x = bodyScroller.scrollLeft | 0
-    headerTable.style.transform = x ? `translate3d(${-x}px,0,0)` : ''
+    const x = bodyScroller.scrollLeft
+    if (headerScroller.scrollLeft !== x) headerScroller.scrollLeft = x
   }
 
   const onBodyScroll = () => {
-    // Coalesca vários eventos de scroll num único frame.
     if (weekScrollRaf) return
     weekScrollRaf = requestAnimationFrame(apply)
   }
@@ -4526,27 +4558,49 @@ onActivated(() => {
     width: 42px !important;
     max-width: 42px !important;
   }
-  /* Scroll horizontal da semana sem dayMinWidth (plugin premium). */
-  .fc-wrapper table.fc-col-header,
-  .fc-wrapper .fc-timegrid-cols > table {
-    width: max-content !important;
+  /* Scroll horizontal: corpo largo o bastante para dias + eixo. */
+  .fc-wrapper .fc-timegrid-body {
     min-width: 100%;
   }
   .fc-wrapper .fc-timegrid-col.fc-day {
     min-width: var(--cal-day-min, 100px) !important;
   }
-  /* Eixo de horas fixo: sticky na coluna + labels (poucas células; o lag vinha do scrollLeft). */
+  /* Eixo de horas sempre visível à esquerda ao arrastar. */
   .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,
   .fc-wrapper .fc-col-header-cell.fc-timegrid-axis,
   .fc-wrapper .fc-timegrid-slot-label {
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    background: #fff;
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 8 !important;
+    background: #fff !important;
+    background-clip: padding-box;
+  }
+  .fc-wrapper .fc-timegrid-slot-label,
+  .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,
+  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
+    min-width: 42px !important;
+    width: 42px !important;
+    max-width: 42px !important;
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
   }
   .fc-wrapper .fc-timegrid-slot-label {
     font-size: 0.65rem;
-    z-index: 4;
+    z-index: 7 !important;
+  }
+  /* Fallback: sticky no cushion interno (td sticky falha em alguns WebKits). */
+  .fc-wrapper .fc-timegrid-slot-label-frame {
+    position: sticky;
+    left: 0;
+    z-index: 7;
+    background: #fff;
+    min-width: 42px;
+    display: flex;
+    justify-content: flex-end;
+    padding-right: 4px;
+  }
+  .fc-wrapper .fc-timegrid-slot-label-cushion {
+    position: relative;
+    z-index: 1;
   }
   .fc-wrapper .fc-event {
     border-radius: 6px !important;
@@ -4554,20 +4608,19 @@ onActivated(() => {
   .fc-wrapper .fc-scrollgrid {
     border-radius: 0;
   }
-  /* Só a grade rola; o header segue via transform (GPU) — sem scrollLeft (lag). */
-  .fc-wrapper .fc-scrollgrid-section-body .fc-scroller {
+  /* Grade rola; header acompanha via scrollLeft (mantém sticky do eixo). */
+  .fc-wrapper .fc-scrollgrid-section-body .fc-scroller,
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
     overscroll-behavior-x: contain;
   }
   .fc-wrapper .fc-scrollgrid-section-header .fc-scroller {
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    scrollbar-width: none;
   }
-  .fc-wrapper table.fc-col-header {
-    will-change: transform;
-    backface-visibility: hidden;
+  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller::-webkit-scrollbar {
+    display: none;
   }
 }
 </style>
