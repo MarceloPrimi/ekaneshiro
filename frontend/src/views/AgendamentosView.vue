@@ -1901,16 +1901,24 @@ function unbindCalendarPinch() {
 
 // ─── Sync scroll horizontal header ↔ body (mobile semana) ──────────────────
 // Sem @fullcalendar/scrollgrid (premium), header e grade são scrollers separados.
-// Usa scrollLeft (não transform) para não quebrar sticky do eixo de horas.
+// Transform + rAF (GPU) — scrollLeft a cada frame deixa o arraste lagado.
 let weekScrollBound = []
-let weekScrollSyncLock = false
+let weekScrollRaf = 0
+let weekScrollHeaderTable = null
 
 function unbindWeekScrollSync() {
   for (const { el, handler } of weekScrollBound) {
     el.removeEventListener('scroll', handler)
   }
   weekScrollBound = []
-  weekScrollSyncLock = false
+  if (weekScrollRaf) {
+    cancelAnimationFrame(weekScrollRaf)
+    weekScrollRaf = 0
+  }
+  if (weekScrollHeaderTable) {
+    weekScrollHeaderTable.style.transform = ''
+    weekScrollHeaderTable = null
+  }
 }
 
 function bindWeekScrollSync() {
@@ -1919,29 +1927,27 @@ function bindWeekScrollSync() {
   const root = calendarPinchEl.value?.querySelector?.('.fc')
   if (!root) return
 
-  const headerScroller = root.querySelector('.fc-col-header')?.closest('.fc-scroller')
+  const headerTable = root.querySelector('table.fc-col-header')
   const bodyScroller = root.querySelector('.fc-timegrid-body')?.closest('.fc-scroller')
-  if (!headerScroller || !bodyScroller) return
+  if (!headerTable || !bodyScroller) return
 
-  const syncFrom = (source, target) => {
-    if (weekScrollSyncLock) return
-    weekScrollSyncLock = true
-    if (target.scrollLeft !== source.scrollLeft) target.scrollLeft = source.scrollLeft
-    requestAnimationFrame(() => { weekScrollSyncLock = false })
+  weekScrollHeaderTable = headerTable
+
+  const apply = () => {
+    weekScrollRaf = 0
+    const x = bodyScroller.scrollLeft | 0
+    headerTable.style.transform = x ? `translate3d(${-x}px,0,0)` : ''
   }
 
-  const onBody = () => syncFrom(bodyScroller, headerScroller)
-  const onHeader = () => syncFrom(headerScroller, bodyScroller)
-  bodyScroller.addEventListener('scroll', onBody, { passive: true })
-  headerScroller.addEventListener('scroll', onHeader, { passive: true })
-  weekScrollBound.push(
-    { el: bodyScroller, handler: onBody },
-    { el: headerScroller, handler: onHeader },
-  )
-  // Alinha de imediato (ex.: após zoom/resize).
-  if (headerScroller.scrollLeft !== bodyScroller.scrollLeft) {
-    headerScroller.scrollLeft = bodyScroller.scrollLeft
+  const onBodyScroll = () => {
+    // Coalesca vários eventos de scroll num único frame.
+    if (weekScrollRaf) return
+    weekScrollRaf = requestAnimationFrame(apply)
   }
+
+  bodyScroller.addEventListener('scroll', onBodyScroll, { passive: true })
+  weekScrollBound.push({ el: bodyScroller, handler: onBodyScroll })
+  apply()
 }
 
 function refreshMobileCalendarChrome() {
@@ -4479,17 +4485,18 @@ onActivated(() => {
   .fc-wrapper .fc-timegrid-col.fc-day {
     min-width: var(--cal-day-min, 132px) !important;
   }
-  /* Eixo de horas fixo ao arrastar pro lado. */
-  .fc-wrapper .fc-timegrid-axis,
-  .fc-wrapper .fc-timegrid-slot-label,
-  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis {
+  /* Eixo de horas fixo: sticky na coluna + labels (poucas células; o lag vinha do scrollLeft). */
+  .fc-wrapper .fc-timegrid-col.fc-timegrid-axis,
+  .fc-wrapper .fc-col-header-cell.fc-timegrid-axis,
+  .fc-wrapper .fc-timegrid-slot-label {
     position: sticky;
     left: 0;
-    z-index: 4;
+    z-index: 5;
     background: #fff;
   }
   .fc-wrapper .fc-timegrid-slot-label {
     font-size: 0.65rem;
+    z-index: 4;
   }
   .fc-wrapper .fc-event {
     border-radius: 6px !important;
@@ -4497,19 +4504,20 @@ onActivated(() => {
   .fc-wrapper .fc-scrollgrid {
     border-radius: 0;
   }
-  /* Header e grade rolam juntos (sync via bindWeekScrollSync). */
-  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller,
+  /* Só a grade rola; o header segue via transform (GPU) — sem scrollLeft (lag). */
   .fc-wrapper .fc-scrollgrid-section-body .fc-scroller {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
+    overscroll-behavior-x: contain;
   }
-  /* Esconde barra do header — o body conduz o gesto. */
   .fc-wrapper .fc-scrollgrid-section-header .fc-scroller {
-    scrollbar-width: none;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
   }
-  .fc-wrapper .fc-scrollgrid-section-header .fc-scroller::-webkit-scrollbar {
-    display: none;
+  .fc-wrapper table.fc-col-header {
+    will-change: transform;
+    backface-visibility: hidden;
   }
 }
 </style>
