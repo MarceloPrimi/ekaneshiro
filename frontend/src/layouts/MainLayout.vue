@@ -245,7 +245,7 @@ import {
   Scissors,
   Sparkles,
   Package,
-  BarChart2,
+  Wallet,
   Users,
   Menu,
   PanelLeftClose,
@@ -328,7 +328,7 @@ const navItems = computed(() => {
     { to: '/produtos', icon: Package, label: 'Produtos' },
   ]
   if (auth.isAdmin) {
-    items.push({ to: '/relatorios', icon: BarChart2, label: 'Relatórios' })
+    items.push({ to: '/financeiro', icon: Wallet, label: 'Financeiro' })
     items.push({ to: '/usuarios', icon: Users, label: 'Usuários' })
   }
   return items

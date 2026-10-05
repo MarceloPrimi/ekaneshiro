@@ -26,3 +26,4 @@ google-auth-oauthlib==1.2.0
 # Utilities
 python-dotenv==1.0.1
 python-multipart==0.0.9  # Form data support
+openpyxl==3.1.5  # Importação de planilhas Financeiro/Despesas

@@ -14,6 +14,7 @@ from api.rotas_dashboard import router as dashboard_router
 from api.rotas_feriados import router as feriados_router
 from api.rotas_preferencias import router as preferencias_router
 from api.rotas_comandas import router as comandas_router
+from api.rotas_financeiro import router as financeiro_router
 
 from core.config import settings
 
@@ -56,6 +57,7 @@ app.include_router(dashboard_router)
 app.include_router(feriados_router)
 app.include_router(preferencias_router)
 app.include_router(comandas_router)
+app.include_router(financeiro_router)
 
 
 @app.get("/health", tags=["Status"])

@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, ForeignKey,
+    Boolean, Column, Date, DateTime, Enum, ForeignKey,
     Integer, JSON, Numeric, String, Text,
 )
 from sqlalchemy.orm import relationship, backref
@@ -481,3 +481,90 @@ class PreferenciasUsuario(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     usuario = relationship("Usuario", backref="preferencias")
+
+
+# ---------------------------------------------------------------------------
+# Financeiro — Controle de Despesas
+# ---------------------------------------------------------------------------
+
+class StatusDespesaEnum(str, enum.Enum):
+    pago = "pago"
+    pendente = "pendente"
+
+
+class RecorrenciaDespesaEnum(str, enum.Enum):
+    avulsa = "avulsa"          # lançamento único
+    mensal = "mensal"          # custo fixo — aparece todo mês
+    temporaria = "temporaria"  # aparece todo mês entre vigência início/fim
+
+
+class CategoriaDespesa(Base):
+    __tablename__ = "categorias_despesa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False, unique=True)
+    ativo = Column(Boolean, default=True, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    despesas = relationship("Despesa", back_populates="categoria")
+
+
+class Despesa(Base):
+    __tablename__ = "despesas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Data em que a despesa foi paga (só para avulsa). Null se pendente/recorrente.
+    data_pagamento = Column(Date, nullable=True, index=True)
+    # Vencimento: obrigatório para custo recorrente (fixo). Em mensal, o dia se repete.
+    data_vencimento = Column(Date, nullable=True, index=True)
+    descricao = Column(String(300), nullable=False)
+    categoria_id = Column(Integer, ForeignKey("categorias_despesa.id"), nullable=False, index=True)
+    status = Column(
+        Enum(StatusDespesaEnum),
+        nullable=False,
+        default=StatusDespesaEnum.pendente,
+        index=True,
+    )
+    valor = Column(Numeric(10, 2), nullable=False)
+    recorrencia = Column(
+        Enum(RecorrenciaDespesaEnum),
+        nullable=False,
+        default=RecorrenciaDespesaEnum.avulsa,
+        index=True,
+    )
+    vigencia_inicio = Column(Date, nullable=True)
+    vigencia_fim = Column(Date, nullable=True)
+    # Hash estável para importação idempotente
+    import_hash = Column(String(64), nullable=True, unique=True, index=True)
+    criado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    categoria = relationship("CategoriaDespesa", back_populates="despesas")
+    criado_por = relationship("Usuario")
+    ocorrencias = relationship(
+        "DespesaOcorrencia", back_populates="despesa", cascade="all, delete-orphan"
+    )
+
+
+class DespesaOcorrencia(Base):
+    """Status de pagamento de uma despesa recorrente em um mês (competência)."""
+
+    __tablename__ = "despesa_ocorrencias"
+
+    id = Column(Integer, primary_key=True, index=True)
+    despesa_id = Column(
+        Integer, ForeignKey("despesas.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    competencia = Column(String(7), nullable=False, index=True)  # YYYY-MM
+    status = Column(
+        Enum(StatusDespesaEnum, name="statusdespesaocorrenciaenum"),
+        nullable=False,
+        default=StatusDespesaEnum.pendente,
+    )
+    data_pagamento = Column(Date, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    despesa = relationship("Despesa", back_populates="ocorrencias")
+

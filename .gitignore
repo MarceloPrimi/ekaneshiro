@@ -1,6 +1,9 @@
 # .env contém segredos reais — NUNCA versionar
 .env
 
+# Referências externas (templates UI) — não versionar
+_ref/
+
 # Ambientes virtuais
 venv/
 .venv/
